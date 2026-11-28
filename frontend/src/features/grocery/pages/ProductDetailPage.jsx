@@ -51,6 +51,7 @@ import { openAvailabilityNotifyModal } from "../../notifications/components/Avai
 
 import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
 import BookmarkButton from "../../bookmarks/components/BookmarkButton";
+import { getPublicHostListing } from "../../host/services/hostUnifiedListing.service";
 
 function formatQuantity(quantity) {
   if (!quantity || quantity.value === undefined || quantity.value === null) {
@@ -546,9 +547,9 @@ function DetailCard({
 }) {
   return (
     <details className="group border-b border-[#C8D8D4] border-l-[3px] border-l-transparent transition-colors open:border-l-[#C86C42] last:border-b-0">
-      <summary className="focus-ring flex min-h-[72px] cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-white/65 group-open:bg-[#F8FCFA] sm:gap-4 sm:px-4 [&::-webkit-details-marker]:hidden">
-        <span className="flex min-w-0 items-center gap-3 sm:gap-4">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-[#BFD5CC] bg-[#F8FCFA] text-[#174E49] group-open:border-[#D6C5B8] group-open:bg-[#F7E9DF]">
+      <summary className="focus-ring flex min-h-[72px] cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-white/65 group-open:bg-[#F8FCFA] sm:gap-4 sm:px-4 [&::-webkit-details-marker]:hidden max-sm:min-h-[60px] max-sm:gap-2 max-sm:px-1 max-sm:py-2">
+        <span className="flex min-w-0 items-center gap-3 sm:gap-4 max-sm:gap-2">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-[#BFD5CC] bg-[#F8FCFA] text-[#174E49] group-open:border-[#D6C5B8] group-open:bg-[#F7E9DF] max-sm:h-9 max-sm:w-9">
             {Icon ? <Icon size={18} strokeWidth={1.8} aria-hidden="true" /> : <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" />}
           </span>
           <span className="min-w-0">
@@ -562,127 +563,10 @@ function DetailCard({
           <ChevronDown size={17} className="transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
         </span>
       </summary>
-      <div className="min-w-0 bg-white/35 px-3 pb-5 pt-3 text-[15px] leading-[1.55] text-[#283E35] sm:px-5 sm:pb-6">
+      <div className="min-w-0 bg-white/35 px-3 pb-5 pt-3 text-[15px] leading-[1.55] text-[#283E35] sm:px-5 sm:pb-6 max-sm:px-2 max-sm:pb-3 max-sm:[overflow-wrap:anywhere]">
         {children}
       </div>
     </details>
-  );
-}
-
-// The original catalogue price checker uses verified Marketplace Pack offers.
-// Approved Host packets have no Pack ID yet, so never create a fake Pack/Offer
-// or activate checkout. Reuse the SAME delivery checker styling with an
-// explicit Host-declared, PIN-specific public lookup instead.
-function HostListingPincodeCheck({ product }) {
-  const currentLocation = useLocationStore((state) => state.currentLocation);
-  const { requestCurrentLocation, status: locationStatus } = useCurrentLocation();
-  const detectedPincode = String(currentLocation?.postcode || "").replace(/\s/g, "").match(/^\d{6}$/)?.[0] || "";
-  const [manualPincode, setManualPincode] = useState(null);
-  const [manualDraft, setManualDraft] = useState("");
-  const [manualEditorOpen, setManualEditorOpen] = useState(false);
-  const [pinEntryError, setPinEntryError] = useState("");
-  const [quote, setQuote] = useState(null);
-  const [checking, setChecking] = useState(false);
-  const [error, setError] = useState("");
-  const pin = manualPincode === null ? detectedPincode : manualPincode;
-  const listingId = String(product?.hostSubmission?.id || "");
-  const needsManualPin = !pin || manualEditorOpen;
-
-  useEffect(() => {
-    let cancelled = false;
-    setQuote(null);
-    setError("");
-    if (!/^[0-9]{6}$/.test(pin) || !/^[a-f0-9]{24}$/i.test(listingId)) {
-      setChecking(false);
-      return () => { cancelled = true; };
-    }
-    setChecking(true);
-    apiClient.get(`/public/host-listings/${encodeURIComponent(listingId)}/pincode-quote`, { params: { pincode: pin } })
-      .then((response) => {
-        if (!cancelled) setQuote(response?.data?.data ?? response?.data ?? null);
-      })
-      .catch((cause) => {
-        if (!cancelled) setError(cause?.response?.data?.message || cause?.message || "Unable to check this PIN right now.");
-      })
-      .finally(() => { if (!cancelled) setChecking(false); });
-    return () => { cancelled = true; };
-  }, [listingId, pin]);
-
-  function submitPincode(event) {
-    event.preventDefault();
-    const next = manualDraft.trim();
-    if (!/^[1-9][0-9]{5}$/.test(next)) {
-      setPinEntryError("Enter a valid 6-digit delivery PIN code.");
-      return;
-    }
-    setPinEntryError("");
-    setManualPincode(next);
-    setManualEditorOpen(false);
-  }
-
-  return (
-    <section className="ep-product-offers min-w-0 border-t-[3px] border-[#214E4A] bg-[#E8F2F1] px-4 py-3 sm:px-5 sm:py-3" aria-label="Check Host listing price by PIN code">
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-[#C7DCD8] pb-2.5 sm:flex-nowrap">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#CFE4E1] text-[#174E49]">
-          <Store size={19} aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">Check price by pincode</h2>
-          <p className="mt-0.5 text-[13px] leading-5 text-[#676E67]">
-            {pin ? `Delivery PIN ${pin} · Host-declared listing` : "Enter a delivery PIN to check the Host's stated service area and price."}
-          </p>
-        </div>
-        {pin && !manualEditorOpen && (
-          <button type="button" onClick={() => { setManualDraft(pin); setManualEditorOpen(true); setPinEntryError(""); }} className="focus-ring ml-auto shrink-0 rounded-full border border-[#A9C8C4] bg-white px-3 py-2 text-sm font-semibold text-[#173F35] hover:border-[#173F35]">Change PIN</button>
-        )}
-      </div>
-
-      {needsManualPin && (
-        <form onSubmit={submitPincode} className="space-y-2 pb-2 pt-2.5">
-          <label htmlFor="host-product-delivery-pincode" className="block text-xs font-semibold text-stone-700">Enter your delivery PIN code</label>
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="relative min-w-0">
-              <MapPin size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true" />
-              <input id="host-product-delivery-pincode" required inputMode="numeric" autoComplete="postal-code" maxLength={6} pattern="[0-9]{6}"
-                value={manualDraft} onFocus={() => { if (!detectedPincode && locationStatus !== "requesting") void requestCurrentLocation(); }}
-                onChange={(event) => { setManualDraft(event.target.value.replace(/\D/g, "").slice(0, 6)); setPinEntryError(""); }}
-                className="focus-ring h-12 w-full rounded-lg border border-[#A9C8C4] bg-white pl-10 pr-3 text-[15px] font-medium text-[#202421] outline-none transition focus:border-[#174E49] focus:ring-2 focus:ring-[#CFE4E1]"
-                placeholder="Enter 6-digit pincode" />
-            </div>
-            <button type="submit" className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#174E49] px-5 py-2 text-[15px] font-semibold text-white transition hover:bg-[#286C62]">
-              <Search size={15} aria-hidden="true" /> Check delivery
-            </button>
-          </div>
-          {detectedPincode && (
-            <button type="button" onClick={() => { setManualPincode(null); setManualDraft(""); setManualEditorOpen(false); setPinEntryError(""); }}
-              className="focus-ring inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">Use current-location PIN {detectedPincode}</button>
-          )}
-          {!detectedPincode && locationStatus === "requesting" && <p className="text-xs text-stone-500">Finding your location PIN...</p>}
-          {pinEntryError && <p role="alert" className="text-xs font-semibold text-rose-700">{pinEntryError}</p>}
-          {manualEditorOpen && pin && <button type="button" onClick={() => setManualEditorOpen(false)} className="text-xs font-semibold text-stone-600 underline">Cancel</button>}
-        </form>
-      )}
-
-      {pin && !manualEditorOpen && (
-        <div className="pt-3">
-          {checking ? (
-            <p role="status" className="bg-white/75 px-3 py-2 text-sm text-[#4C655D]">Checking Host-declared service area for {pin}...</p>
-          ) : error ? (
-            <p role="alert" className="border-l-[3px] border-rose-500 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p>
-          ) : quote ? (
-            <div className="border-l-[3px] border-[#2F856D] bg-white/75 px-3 py-3">
-              <p className="text-[14px] font-semibold leading-6 text-[#173F35]">
-                {quote.pickupOnly ? "This Host lists pickup only, not delivery." : quote.declaredCoverage
-                  ? `This Host has listed delivery to PIN ${pin}.` : `This Host has not listed delivery to PIN ${pin}.`}
-              </p>
-              {quote.declaredCoverage && quote.declaredPrice !== null && quote.declaredPrice !== undefined && (
-                <p className="mt-1 text-[22px] font-semibold text-[#202421]">₹{Number(quote.declaredPrice).toLocaleString("en-IN", { maximumFractionDigits: 2 })} <span className="text-[12px] font-medium text-[#647168]">Host-declared price</span></p>
-              )}
-            </div>
-          ) : null}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -710,6 +594,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
 
   const [checked, setChecked] = useState(false);
   const [checkedPincode, setCheckedPincode] = useState("");
+  const [hostQuote, setHostQuote] = useState(null);
 
   const [error, setError] = useState(null);
 
@@ -772,7 +657,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
     return normalized;
   }
 
-  const packId = useMemo(
+  const canonicalPackId = useMemo(
     () =>
       product?.pack?.id ||
       product?.pack?._id ||
@@ -781,6 +666,13 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       null,
     [product]
   );
+  const hostListingId = product?.isHostListing && !canonicalPackId
+    ? String(product?.hostSubmission?.id || "") : "";
+  const lookupIdentity = hostListingId ? `host:${hostListingId}` : canonicalPackId || "";
+  const currentLookupKey = `${lookupIdentity}:${pincode.trim()}:${fulfillmentType}`;
+  const packId = hostListingId
+    ? (hostQuote?.key === currentLookupKey ? hostQuote.packId : null)
+    : canonicalPackId;
 
   async function syncExistingCartQuantity(offer, nextQuantity) {
     const floatingCart = readFloatingMarketplaceCart();
@@ -849,14 +741,15 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   useEffect(() => {
     let cancelled = false;
     const lookupPincode = pincode.trim();
-    const lookupKey = `${packId || ""}:${lookupPincode}:${fulfillmentType}`;
+    const lookupKey = `${lookupIdentity}:${lookupPincode}:${fulfillmentType}`;
 
     setOffers([]);
+    setHostQuote(null);
     setError(null);
     setChecked(false);
     setCheckedPincode("");
 
-    if (!packId || !/^\d{6}$/.test(lookupPincode)) {
+    if (!lookupIdentity || !/^\d{6}$/.test(lookupPincode)) {
       setLoading(false);
       onOffersResolved?.({ offer: null, pincode: lookupPincode });
       return () => { cancelled = true; };
@@ -866,20 +759,28 @@ function MarketplaceOffers({ product, onOffersResolved }) {
 
     async function checkDelivery() {
       try {
-        const result = await getPublicPackOffers({
-          packId,
-          pincode: lookupPincode,
-          fulfillmentType,
-        });
+        let result;
+        let resolvedPackId = canonicalPackId;
+        if (hostListingId) {
+          const response = await apiClient.get(`/public/host-listings/${encodeURIComponent(hostListingId)}/pincode-quote`, {
+            params: { pincode: lookupPincode },
+          });
+          result = response?.data?.data ?? response?.data;
+          if (cancelled) return;
+          resolvedPackId = result?.purchasable === true ? result?.packId : null;
+          setHostQuote({ key: lookupKey, packId: resolvedPackId, declaredCoverage: result?.declaredCoverage === true, pickupOnly: result?.pickupOnly === true });
+        } else {
+          result = await getPublicPackOffers({ packId: canonicalPackId, pincode: lookupPincode, fulfillmentType });
+        }
         if (cancelled) return;
 
-        const nextOffers = Array.isArray(result?.offers) ? result.offers : [];
+        const nextOffers = resolvedPackId && Array.isArray(result?.offers) ? result.offers.filter(offer => offer?.id && (!offer.packId || String(offer.packId) === String(resolvedPackId))) : [];
         setOffers(nextOffers);
         setQuantityByOfferId((current) => {
           const next = {};
           const floatingCart = readFloatingMarketplaceCart();
           const floatingItem = floatingCart?.items?.find(
-            (item) => String(item?.packId || "") === String(packId)
+            (item) => String(item?.packId || "") === String(resolvedPackId)
           );
           for (const offer of nextOffers) {
             const minimum = Math.max(1, Number(offer?.minimumOrderQuantity || 1));
@@ -916,10 +817,10 @@ function MarketplaceOffers({ product, onOffersResolved }) {
     return () => { cancelled = true; };
     // Only the Pack ID and chosen PIN determine when availability is rechecked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [packId, pincode, fulfillmentType]);
+  }, [lookupIdentity, canonicalPackId, hostListingId, pincode, fulfillmentType]);
 
   const verifiedForCurrentPin =
-    checked && checkedPincode === `${packId || ""}:${pincode.trim()}:${fulfillmentType}`;
+    checked && checkedPincode === currentLookupKey;
   const visibleOffers = verifiedForCurrentPin && !error ? offers : [];
   // Every row comes from the same canonical pack ID and selected PIN.
   // Rank by the known item price only; delivery charges are not yet quoted.
@@ -1064,13 +965,13 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   }
 
   return (
-    <section className="ep-product-offers min-w-0 border-t-[3px] border-[#C56C42] bg-[#F7F6F2] px-4 py-4 sm:px-5 sm:py-5">
-      <div className="flex flex-wrap items-center gap-3 border-b border-[#D7DDCF] pb-4 sm:flex-nowrap">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#D7DDCF] text-[#173F35]">
+    <section className="ep-product-offers min-w-0 rounded-lg border border-[#D7DDCF] bg-white p-3 sm:p-4 max-sm:p-2.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#D7DDCF] pb-2.5 sm:flex-nowrap max-sm:gap-2 max-sm:pb-2">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#D7DDCF] text-[#173F35]">
           <Store size={21} aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[21px] font-bold tracking-[-0.035em] text-[#173F35] sm:text-[24px]">
+          <h2 className="text-[18px] font-bold tracking-[-0.025em] text-[#173F35] sm:text-xl max-sm:leading-tight">
             {fulfillmentType === "pickup" ? "Pickup availability" : "Delivery availability"}
           </h2>
           <p className="mt-0.5 text-sm text-[#202421]/70">
@@ -1081,7 +982,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
           <button
             type="button"
             onClick={openManualPinEditor}
-            className="focus-ring ml-auto min-h-10 shrink-0 rounded-full border border-[#173F35]/30 bg-[#F7F6F2] px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#C56C42] hover:text-[#C56C42]"
+            className="focus-ring ml-auto min-h-9 shrink-0 rounded-lg border border-[#173F35]/30 bg-[#F7F6F2] px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#C56C42] hover:text-[#C56C42] max-sm:px-2.5 max-sm:text-[13px]"
           >
             Change PIN
           </button>
@@ -1090,7 +991,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
 
       {pincode && !manualEditorOpen && (
         <div className="py-1.5">
-          {!packId ? (
+          {!lookupIdentity ? (
             <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
               Delivery details are not available for this product yet.
             </p>
@@ -1099,13 +1000,13 @@ function MarketplaceOffers({ product, onOffersResolved }) {
               Checking delivery to {pincode}...
             </p>
           ) : !error && visibleOffers.length > 0 ? (
-            <p role="status" className="inline-flex items-center gap-2 rounded-lg bg-[#D7DDCF]/55 px-3 py-2 text-sm font-semibold text-[#173F35]">
+            <p role="status" className="inline-flex items-center gap-2 rounded-md bg-[#D7DDCF]/55 px-2.5 py-1.5 text-sm font-semibold text-[#173F35]">
               <span className="h-2 w-2 shrink-0 rounded-full bg-[#173F35]" aria-hidden="true" />
               {fulfillmentType === "pickup" ? "Pickup available" : "Delivery available"}
             </p>
           ) : !error ? (
-            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
-              We don't deliver this product to this PIN code or location right now.
+            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+              {hostQuote?.pickupOnly ? "Pickup only" : hostQuote?.declaredCoverage ? "Delivery area covered. No purchasable stock at the moment." : "Not available at this PIN."}
             </p>
           ) : null}
         </div>
@@ -1117,7 +1018,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
           className="space-y-2 pb-2 pt-2.5"
         >
           <label htmlFor="product-delivery-pincode" className="block text-xs font-semibold text-stone-700">
-            {pincode ? "Check delivery to another location" : "Enter your delivery PIN code"}
+            Delivery PIN
           </label>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <div className="relative min-w-0">
@@ -1150,7 +1051,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
             </div>
             <button
               type="submit"
-              className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#174E49] px-5 py-2 text-[15px] font-semibold text-white transition hover:bg-[#286C62]"
+              className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#173F35] px-4 py-2 text-[15px] font-semibold text-white transition hover:bg-[#286C62]"
             >
               <Search size={15} aria-hidden="true" />
               Check delivery
@@ -1167,7 +1068,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
               }}
               className="focus-ring inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
             >
-              Use suggested current-location PIN {detectedPincode}
+              Use current PIN {detectedPincode}
             </button>
           )}
           {!detectedPincode && locationStatus === "requesting" && (
@@ -1195,11 +1096,11 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       )}
 
       {!manualEditorOpen && visibleOffers.length > 0 && (
-        <div className="mt-4 min-w-0">
+        <div className="mt-2 min-w-0">
           {hasCompetingSellers && (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-lg font-bold tracking-[-0.03em] text-[#173F35]">
-                Compare EPANTRY sellers
+                Available sellers
               </h3>
               <span className="rounded-full bg-[#D7DDCF] px-3 py-1 text-xs font-semibold text-[#173F35]">
                 {distinctSellerKeys.size} sellers
@@ -1218,9 +1119,9 @@ function MarketplaceOffers({ product, onOffersResolved }) {
             {purchaseOffers.map((offer) => (
               <article
                 key={offer.id}
-                className="min-w-0 overflow-hidden rounded-xl border border-[#D7DDCF] bg-[#F7F6F2]"
+                className="min-w-0 overflow-hidden rounded-lg border border-[#D7DDCF] bg-white"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-4 sm:px-5">
+                <div className="flex flex-wrap items-start justify-between gap-2 px-3 py-2.5 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:px-2.5">
                   <div className="min-w-0">
                     <p className="break-words text-[16px] font-bold leading-6 text-[#173F35]">
                       {offer.seller?.name || "EPANTRY Host"}
@@ -1232,8 +1133,8 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                   </div>
 
                   <div className="text-left sm:text-right">
-                    <div className="flex flex-wrap items-baseline gap-2 sm:justify-end">
-                      <span className="whitespace-nowrap text-[27px] font-bold leading-none tracking-[-0.045em] text-[#202421]">
+                    <div className="flex flex-wrap items-baseline gap-2 sm:justify-end max-sm:justify-end max-sm:gap-1">
+                      <span className="whitespace-nowrap text-[24px] font-bold leading-none tracking-[-0.045em] text-[#202421] max-sm:text-[22px]">
                         {formatMoney(
                           offer.price?.effectiveAmountMinor,
                           offer.price?.currency || "INR"
@@ -1252,7 +1153,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-end justify-between gap-3 border-t border-[#D7DDCF] px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap items-end justify-between gap-2 border-t border-[#D7DDCF] px-3 py-2.5 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] max-sm:gap-2 max-sm:px-2.5 max-[350px]:!grid-cols-1">
                   <div>
                     <label
                       htmlFor={`ep-offer-quantity-${offer.id}`}
@@ -1260,14 +1161,14 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                     >
                       Quantity
                     </label>
-                    <div className="inline-flex h-11 items-center overflow-hidden rounded-lg border border-[#D7DDCF] bg-[#F7F6F2]">
+                    <div className="inline-flex h-11 items-center overflow-hidden rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] max-sm:flex max-sm:w-full max-sm:min-w-0">
                       <button
                         type="button"
                         aria-label="Decrease quantity"
                         disabled={Boolean(addingOfferId) ||
                           getOfferQuantity(offer) <= getOfferQuantityBounds(offer).minimum}
                         onClick={() => handleQuantityStep(offer, getOfferQuantity(offer) - 1)}
-                        className="focus-ring grid h-11 w-10 place-items-center text-[#173F35] transition hover:bg-[#D7DDCF] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="focus-ring grid h-11 w-10 place-items-center text-[#173F35] transition hover:bg-[#D7DDCF] disabled:cursor-not-allowed disabled:opacity-40 max-sm:w-9 max-sm:shrink-0"
                       >
                         <Minus size={16} aria-hidden="true" />
                       </button>
@@ -1281,7 +1182,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                         disabled={Boolean(addingOfferId)}
                         onChange={(event) => setOfferQuantity(offer, event.target.value)}
                         onBlur={() => void syncExistingCartQuantity(offer, getOfferQuantity(offer))}
-                        className="h-11 w-14 border-x border-[#D7DDCF] bg-[#F7F6F2] text-center text-sm font-semibold text-[#202421] outline-none disabled:opacity-50"
+                        className="h-11 w-14 border-x border-[#D7DDCF] bg-[#F7F6F2] text-center text-sm font-semibold text-[#202421] outline-none disabled:opacity-50 max-sm:w-0 max-sm:min-w-0 max-sm:flex-1 max-sm:[appearance:textfield] max-sm:[&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button
                         type="button"
@@ -1289,7 +1190,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                         disabled={Boolean(addingOfferId) ||
                           getOfferQuantity(offer) >= getOfferQuantityBounds(offer).maximum}
                         onClick={() => handleQuantityStep(offer, getOfferQuantity(offer) + 1)}
-                        className="focus-ring grid h-11 w-10 place-items-center text-[#173F35] transition hover:bg-[#D7DDCF] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="focus-ring grid h-11 w-10 place-items-center text-[#173F35] transition hover:bg-[#D7DDCF] disabled:cursor-not-allowed disabled:opacity-40 max-sm:w-9 max-sm:shrink-0"
                       >
                         <Plus size={16} aria-hidden="true" />
                       </button>
@@ -1300,7 +1201,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                     type="button"
                     disabled={Boolean(addingOfferId)}
                     onClick={(event) => handleAddToCart(offer, event.currentTarget)}
-                    className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#C56C42] px-5 py-2.5 text-sm font-bold text-[#F7F6F2] transition hover:bg-[#AD5934] disabled:cursor-not-allowed disabled:opacity-50 max-[390px]:w-full"
+                    className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#C56C42] px-5 py-2.5 text-sm font-bold text-[#F7F6F2] transition hover:bg-[#AD5934] disabled:cursor-not-allowed disabled:opacity-50 max-[390px]:w-full max-sm:w-full max-sm:px-2 max-sm:gap-1.5 max-sm:leading-tight"
                   >
                     <ShoppingCart size={17} aria-hidden="true" />
                     {addingOfferId === offer.id ? "Adding..." : "Add to Cart"}
@@ -1331,7 +1232,7 @@ function ProductDetailsSheet({ product }) {
   const allergens = Array.isArray(product?.allergens) ? product.allergens : [];
 
   const detailRows = [
-    ["Brand", product?.brand?.name || "Not declared"],
+    ["Brand", visibleProductBrand(product) || "Not declared"],
     ["Category", product?.category?.name || "Not declared"],
     ["Net quantity", formatQuantity(product?.netQuantity)],
     ["Pack", product?.pack?.name || product?.pack?.type || "Not declared"],
@@ -1555,72 +1456,41 @@ function inferProductRecommendationCategory(product) {
   return matchedRule?.slug || categorySlug;
 }
 
+function visibleProductBrand(product) {
+  const name = String(product?.brand?.name || "").trim();
+  return /^host kitchen(?:\s+[a-f0-9]+)?$/i.test(name) ? "" : name;
+}
+
+function recommendationDietary(product) {
+  const value = String(product?.hostSubmission?.dietary || product?.recommendationDietary || (typeof product?.dietary === "string" ? product.dietary : "") || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["vegetarian", "vegan", "veg"].includes(value)) return "veg";
+  if (["non_vegetarian", "nonveg", "non_veg"].includes(value)) return "nonveg";
+  return "";
+}
+
 function RecommendationProductCard({ product, variant = "basket" }) {
   const path = `/grocery/product/${encodeURIComponent(product?.slug || "")}`;
   const imageUrl = product?.image?.url || "";
-  const quantity =
-    product?.netQuantity?.value !== undefined &&
-    product?.netQuantity?.value !== null
-      ? `${product.netQuantity.value} ${product.netQuantity.unit || ""}`.trim()
-      : "";
+  const title = product?.displayName || "Grocery product";
+  const quantity = product?.netQuantity?.value != null
+    ? `${product.netQuantity.value} ${product.netQuantity.unit || ""}`.trim() : "";
+  const diet = recommendationDietary(product);
   const mediaTone = variant === "similar" ? "bg-[#F4F0E8]" : "bg-[#EAF1EB]";
-
   return (
-    <article className="group relative flex h-full min-h-[206px] min-w-0 overflow-hidden rounded-[13px] border border-[#D7DFD6] bg-[#FFFEFA] shadow-[0_3px_12px_rgba(20,48,36,0.035)] transition-[border-color,box-shadow] duration-200 hover:border-[#9CB5A4] hover:shadow-[0_10px_24px_rgba(20,48,36,0.09)]">
-      <Link
-        to={path}
-        className={`focus-ring relative block w-[43%] shrink-0 overflow-hidden ${mediaTone}`}
-        aria-label={`View ${product?.displayName || "product"}`}
-      >
+    <Link to={path} aria-label={`View ${title}`} className="focus-ring group flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#D7DDCF] bg-[#FFFEFA] transition-colors hover:border-[#C56C42]">
+      <div className={`relative grid aspect-[4/3] min-w-0 place-items-center overflow-hidden max-sm:aspect-square ${mediaTone}`}>
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            {...publicImageProps(imageUrl, {
-              widths: [320, 480, 720],
-              sizes: "(max-width: 640px) 40vw, 16vw",
-            })}
-            alt={product?.image?.alt || product?.displayName || "Product"}
-            className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transform-none"
-            loading="lazy"
-          />
-        ) : (
-          <div className="grid h-full min-h-[200px] place-items-center text-[#94A59A]">
-            <Package size={36} strokeWidth={1.3} aria-hidden="true" />
-          </div>
-        )}
-      </Link>
-
-      <div className="flex min-w-0 flex-1 flex-col px-4 pb-3.5 pt-4">
-        <p className="truncate pr-9 text-[11px] font-bold uppercase tracking-[0.07em] text-[#68786E]">
-          {product?.brand?.name || product?.category?.name || "EPANTRY grocery"}
-        </p>
-        <h3 className="mt-3 line-clamp-3 text-[16px] font-bold leading-[1.35] tracking-[-0.025em] text-[#173F35]">
-          {product?.displayName || "Grocery product"}
-        </h3>
-        <div className="mt-auto pt-3">
-          <p className="truncate text-[13px] font-medium text-[#6A786D]">
-            {quantity || product?.pack?.name || ""}
-          </p>
-          <Link
-            to={path}
-            className="focus-ring mt-3 flex min-h-[38px] items-center justify-between gap-2 border-t border-[#DDE4DA] pt-2.5 text-[13px] font-bold text-[#173F35] transition-colors hover:text-[#AD5835]"
-            aria-label={`View details of ${product?.displayName || "product"}`}
-          >
-            <span>View product</span>
-            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#173F35] text-white transition-colors group-hover:bg-[#B35F40]">
-              <ArrowRight size={16} strokeWidth={1.8} aria-hidden="true" />
-            </span>
-          </Link>
-        </div>
+          <img {...publicImageProps(imageUrl, { widths: [160, 320, 480], sizes: "(max-width: 640px) 44vw, 20vw" })} alt={product?.image?.alt || title} className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4 max-sm:p-2" loading="lazy" />
+        ) : <Package size={36} strokeWidth={1.3} className="text-[#829389]" aria-hidden="true" />}
+        {diet && <span role="img" aria-label={diet === "veg" ? "Vegetarian" : "Non-vegetarian"} title={diet === "veg" ? "Vegetarian" : "Non-vegetarian"} className="absolute right-2.5 top-2.5 grid size-6 place-items-center rounded-sm border-2 bg-white max-sm:right-1.5 max-sm:top-1.5" style={{ borderColor: diet === "veg" ? "#16803D" : "#8B3F27" }}>
+          {diet === "veg" ? <span className="size-3 rounded-full bg-[#16803D]" /> : <span className="size-0 border-x-[6px] border-b-[11px] border-x-transparent border-b-[#8B3F27]" />}
+        </span>}
       </div>
-
-      <BookmarkButton
-        kind="grocery"
-        slug={product?.slug}
-        title={product?.displayName}
-        className="absolute! right-3 top-3 z-20"
-      />
-    </article>
+      <div className="min-w-0 px-3 py-3 sm:px-4 max-sm:px-2 max-sm:py-2.5">
+        <h3 className="break-words text-[15px] font-semibold leading-snug text-[#202421] sm:text-base [overflow-wrap:anywhere] max-sm:text-[15px] max-sm:leading-[1.35]">{title}</h3>
+        {quantity && <p className="mt-1 break-words text-sm text-[#52655A]">{quantity}</p>}
+      </div>
+    </Link>
   );
 }
 
@@ -1709,12 +1579,12 @@ function ProductRecommendationShelf({
 
   return (
     <section>
-      <div className="mb-6 flex flex-col gap-4 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-4 flex flex-col gap-2 sm:mb-5 sm:flex-row sm:items-end sm:justify-between max-sm:flex-row max-sm:items-end max-sm:justify-between max-sm:mb-3">
         <div>
           <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#A75E42]">
             {eyebrow}
           </p>
-          <h2 className="mt-2 text-[28px] font-semibold leading-[1.15] tracking-[-0.045em] text-[#173F35] sm:text-[35px]">
+          <h2 className="mt-2 text-[28px] font-semibold leading-[1.15] tracking-[-0.045em] text-[#173F35] sm:text-[35px] max-sm:mt-1 max-sm:text-[23px]">
             {title}
           </h2>
           {description ? (
@@ -1733,34 +1603,13 @@ function ProductRecommendationShelf({
         </Link>
       </div>
 
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:pb-0 xl:grid-cols-3">
-        {loading
-          ? Array.from({ length: PRODUCT_RECOMMENDATION_LIMIT }).map(
-              (_, index) => (
-                <div
-                  key={index}
-                  className="w-[88%] min-w-[275px] shrink-0 snap-start sm:w-auto sm:min-w-0 sm:shrink"
-                >
-                  <div className="flex min-h-[206px] overflow-hidden rounded-[13px] border border-[#D7DFD6] bg-[#FFFEFA]">
-                    <div className="w-[43%] shrink-0 animate-pulse bg-[#E8EEE7]" />
-                    <div className="flex flex-1 flex-col gap-3 p-4">
-                      <div className="h-3 w-1/2 animate-pulse rounded bg-[#DCE6DD]" />
-                      <div className="h-5 w-full animate-pulse rounded bg-[#DCE6DD]" />
-                      <div className="h-5 w-4/5 animate-pulse rounded bg-[#DCE6DD]" />
-                      <div className="mt-auto h-8 animate-pulse rounded bg-[#DCE6DD]" />
-                    </div>
-                  </div>
-                </div>
-              )
-            )
-          : items.map((item) => (
-              <div
-                key={getProductRecommendationKey(item)}
-                className="w-[88%] min-w-[275px] shrink-0 snap-start sm:w-auto sm:min-w-0 sm:shrink"
-              >
-                <RecommendationProductCard product={item} variant={variant} />
-              </div>
-            ))}
+      <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 max-sm:gap-2">
+        {loading ? Array.from({ length: PRODUCT_RECOMMENDATION_LIMIT }).map((_, index) => (
+          <div key={index} className="overflow-hidden rounded-xl border border-[#D7DDCF] bg-[#FFFEFA]">
+            <div className="aspect-[4/3] animate-pulse bg-[#E8EEE7]" />
+            <div className="space-y-2 p-3"><div className="h-4 w-full animate-pulse rounded bg-[#DCE6DD]" /><div className="h-3 w-1/3 animate-pulse rounded bg-[#DCE6DD]" /></div>
+          </div>
+        )) : items.map(item => <RecommendationProductCard key={getProductRecommendationKey(item)} product={item} variant={variant} />)}
       </div>
     </section>
   );
@@ -2095,6 +1944,22 @@ export default function ProductDetailPage() {
         setFrequentlyBought(nextFrequent);
         setSimilarProducts(nextSimilar);
         setSimilarCategorySlug(recommendationCategory);
+        // Catalog list rows omit dietary data. Look up the exact approved Host listing,
+        // never infer food preference from a name, image or category.
+        const listingIdFor = item => String(item?.hostSubmission?.id || "") || /^epantry-listing-([a-f0-9]{24})(?:--|$)/i.exec(String(item?.slug || ""))?.[1] || "";
+        const ids = [...new Set([...nextFrequent, ...nextSimilar].filter(item => !recommendationDietary(item)).map(listingIdFor).filter(id => /^[a-f0-9]{24}$/i.test(id)))];
+        if (ids.length) {
+          void Promise.allSettled(ids.map(async id => {
+            const response = await getPublicHostListing(id);
+            return [id, response?.listing?.dietary || ""];
+          })).then(results => {
+            if (!active) return;
+            const byId = new Map(results.filter(result => result.status === "fulfilled").map(result => result.value));
+            const enrich = items => items.map(item => byId.has(listingIdFor(item)) ? { ...item, recommendationDietary: byId.get(listingIdFor(item)) } : item);
+            setFrequentlyBought(enrich);
+            setSimilarProducts(enrich);
+          });
+        }
       } catch {
         if (active) {
           setFrequentlyBought([]);
@@ -2186,13 +2051,13 @@ export default function ProductDetailPage() {
   const countryCopy = countryDescription(product.countryOfOrigin);
 
   return (
-    <main className="ep-product-page min-h-screen bg-[#FDFDFA] text-[#202421]">
-      <div className="mx-auto w-full max-w-[1480px] px-5 pb-14 pt-0 sm:px-9 lg:px-14">
-        <div className="flex items-center justify-between gap-4 border-b border-[#E7E9E4] py-0.5">
+    <main className="ep-product-page min-h-screen bg-[#FDFDFA] text-[#202421] max-sm:min-w-0 max-sm:w-full">
+      <div className="mx-auto w-full max-w-[1480px] px-5 pb-14 pt-0 sm:px-9 lg:px-14 max-sm:min-w-0 max-sm:px-2.5 max-sm:pb-6">
+        <div className="flex items-center justify-between gap-4 border-b border-[#E7E9E4] py-0.5 max-sm:flex-wrap max-sm:gap-x-3 max-sm:gap-y-0 max-sm:py-1">
           <Link to="/grocery" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9">
             <ArrowLeft size={17} aria-hidden="true" /> Back to Grocery
           </Link>
-          <div className="flex flex-wrap items-center justify-end gap-4">
+          <div className="flex flex-wrap items-center justify-end gap-4 max-sm:min-w-0 max-sm:gap-x-3 max-sm:gap-y-0">
             <Link
               to={`/report-listing?listingUrl=${encodeURIComponent(`/grocery/product/${product.slug}`)}`}
               className="focus-ring inline-flex min-h-11 items-center text-sm font-semibold text-[#955338] hover:underline sm:min-h-9"
@@ -2203,22 +2068,22 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        <section className="ep-product-hero relative grid min-w-0 gap-0 border-b border-[#E2E5DE] lg:min-h-[calc(100svh-120px)] lg:items-stretch lg:grid-cols-[minmax(0,1.07fr)_minmax(0,0.93fr)]">
+        <section className="ep-product-hero relative grid min-w-0 gap-0 border-b border-[#E2E5DE] lg:min-h-[calc(100svh-120px)] lg:items-stretch lg:grid-cols-[minmax(0,1.07fr)_minmax(0,0.93fr)] max-sm:grid-cols-[minmax(0,1fr)]">
           <div className="min-w-0 lg:flex lg:min-h-0 lg:flex-col lg:pr-10 xl:pr-16">
-            <div className="relative flex min-h-[390px] flex-col justify-center overflow-hidden bg-[#EEF2EC] sm:min-h-[540px] lg:min-h-0 lg:flex-1">
-              <div className="absolute left-5 top-6 z-10 text-xs font-semibold tracking-[0.08em] text-[#5C6A60] sm:left-8 sm:top-8">
+            <div className="relative flex min-h-[390px] flex-col justify-center overflow-hidden bg-[#EEF2EC] sm:min-h-[540px] lg:min-h-0 lg:flex-1 max-sm:min-h-0 max-sm:justify-start max-sm:pb-2">
+              <div className="absolute left-5 top-6 z-10 text-xs font-semibold tracking-[0.08em] text-[#5C6A60] sm:left-8 sm:top-8 max-sm:left-3 max-sm:top-3 max-sm:text-[13px]">
                 {product.category?.name || "EPANTRY grocery"}
               </div>
-              <div ref={mobileHeroGalleryRef} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-6 pt-16 [scrollbar-width:thin] lg:hidden" aria-label="Swipe product images and details">
+              <div ref={mobileHeroGalleryRef} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-6 pt-16 [scrollbar-width:thin] lg:hidden max-sm:relative max-sm:w-full max-sm:min-w-0 max-sm:gap-0 max-sm:px-0 max-sm:pb-0 max-sm:pt-9 max-sm:[scrollbar-width:none]" aria-label="Swipe product images and details">
                 {productGalleryItems.map((item, index) => (
                   <div
                     key={item.type === "details" ? "mobile-product-details-sheet" : `mobile-${item.image?.url}-${index}`}
-                    className="h-[340px] w-[88%] shrink-0 snap-center overflow-hidden border border-[#E4E8E0] bg-[#fffefa] sm:h-[470px]"
+                    className="h-[340px] w-[88%] shrink-0 snap-center overflow-hidden border border-[#E4E8E0] bg-[#fffefa] sm:h-[470px] max-sm:h-auto max-sm:aspect-square max-sm:w-full max-sm:min-w-0 max-sm:snap-start"
                   >
                     {item.type === "details" ? (
                       <ProductDetailsSheet product={product} />
                     ) : (
-                      <img {...publicImageProps(item.image.url, { widths: [480, 720, 960], sizes: "(max-width: 640px) 88vw, 45vw" })} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-5" />
+                      <img {...publicImageProps(item.image.url, { widths: [480, 720, 960], sizes: "(max-width: 640px) 88vw, 45vw" })} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-5 max-sm:p-2.5" />
                     )}
                   </div>
                 ))}
@@ -2245,11 +2110,11 @@ export default function ProductDetailPage() {
                   {String(Math.min(activeProductPhoto, productImages.length - 1) + 1).padStart(2, "0")} / {String(productImages.length).padStart(2, "0")}
                 </span>
               )}
-              <button type="button" onClick={() => setShowAllImages(true)} className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8">
+              <button type="button" onClick={() => setShowAllImages(true)} className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8 max-sm:static max-sm:mr-2 max-sm:mt-2 max-sm:self-end">
                 <ZoomIn size={17} aria-hidden="true" /> View gallery
               </button>
             </div>
-            <div className="flex items-center gap-2.5 overflow-x-auto border-b border-[#DDE6DB] py-3 sm:gap-3 sm:py-4 lg:h-[108px] lg:flex-none lg:py-2" role="group" aria-label="Select product photos or open the product information gallery">
+            <div className="flex items-center gap-2.5 overflow-x-auto border-b border-[#DDE6DB] py-3 sm:gap-3 sm:py-4 lg:h-[108px] lg:flex-none lg:py-2 max-sm:min-w-0 max-sm:gap-2 max-sm:px-1 max-sm:py-2.5 max-sm:[scrollbar-width:thin]" role="group" aria-label="Select product photos or open the product information gallery">
               {productGalleryItems.map((item, index) => (
                 <button
                   key={item.type === "details" ? "product-facts-gallery-tile" : `product-tile-${item.image?.url}-${index}`}
@@ -2272,7 +2137,7 @@ export default function ProductDetailPage() {
                     }
                   }}
                   aria-pressed={item.type === "image" ? (index === 0 ? 0 : index - 1) === activeProductPhoto : undefined}
-                  className={`focus-ring flex h-[75px] w-[75px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border bg-[#FFFEFA] text-[#173F35] transition hover:border-[#173F35] sm:h-[88px] sm:w-[88px] ${item.type === "image" && (index === 0 ? 0 : index - 1) === activeProductPhoto ? "border-[#C86C42] ring-2 ring-[#C86C42]/30" : "border-[#DBDFD7]"}`}
+                  className={`focus-ring flex h-[75px] w-[75px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border bg-[#FFFEFA] text-[#173F35] transition hover:border-[#173F35] sm:h-[88px] sm:w-[88px] max-sm:h-[60px] max-sm:w-[60px] ${item.type === "image" && (index === 0 ? 0 : index - 1) === activeProductPhoto ? "border-[#C86C42] ring-2 ring-[#C86C42]/30" : "border-[#DBDFD7]"}`}
                   aria-label={item.type === "details" ? "Open full product information sheet" : `Show ${item.image?.alt || "product photograph"}`}
                 >
                   {item.type === "details" ? (
@@ -2281,7 +2146,7 @@ export default function ProductDetailPage() {
                       <div className="flex flex-1 flex-col justify-center gap-1 px-2.5">
                         <span className="line-clamp-2 text-[9px] font-semibold leading-tight text-[#173F35]">{product.displayName}</span>
                         <span className="h-px bg-[#D6DDD5]" />
-                        <span className="text-[8px] text-[#617269]">{product.brand?.name || "Product"}</span>
+                        <span className="text-[8px] text-[#617269]">{visibleProductBrand(product) || "Product"}</span>
                         <span className="h-px bg-[#D6DDD5]" />
                         <span className="text-[8px] text-[#617269]">{formatQuantity(product.netQuantity)}</span>
                       </div>
@@ -2294,18 +2159,18 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="min-w-0 px-1 pb-10 pt-9 sm:px-4 sm:pt-14 lg:pb-4 lg:pl-8 lg:pt-6 xl:pl-14 xl:pt-8">
+          <div className="min-w-0 px-1 pb-10 pt-9 sm:px-4 sm:pt-14 lg:pb-4 lg:pl-8 lg:pt-6 xl:pl-14 xl:pt-8 max-sm:px-1 max-sm:pb-5 max-sm:pt-4">
             <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-[#173F35]">
               <span className="h-[2px] w-7 bg-[#C86C42]" aria-hidden="true" />
-              {product.brand?.name || "EPANTRY grocery"}
+              {visibleProductBrand(product) || "EPANTRY grocery"}
             </div>
-            <h1 className="mt-5 max-w-[650px] break-words text-[38px] font-medium leading-[1.09] tracking-[-0.055em] text-[#202421] sm:text-[50px] xl:text-[clamp(44px,4.4vw,66px)]">
+            <h1 className="mt-5 max-w-[650px] break-words text-[38px] font-medium leading-[1.09] tracking-[-0.055em] text-[#202421] sm:text-[50px] xl:text-[clamp(44px,4.4vw,66px)] max-sm:mt-2 max-sm:text-[30px] max-sm:leading-[1.15] max-sm:[overflow-wrap:anywhere]">
               {product.displayName}
             </h1>
             {product.variant?.name && product.variant.name !== product.displayName && (
               <p className="mt-2 text-xl font-medium text-[#6E806B] sm:text-2xl">{product.variant.name}</p>
             )}
-            <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-[#E0E6DF] py-4">
+            <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-[#E0E6DF] py-4 max-sm:mt-3 max-sm:gap-y-1 max-sm:py-2.5">
               {product.category?.name && (
                 <span className="text-[14px] font-medium text-[#34685C]">{product.category.name}</span>
               )}
@@ -2318,21 +2183,19 @@ export default function ProductDetailPage() {
                   <span className="text-[14px] font-medium text-[#637267]">{product.pack.name}</span>
                 )}
             </div>
-            {product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && <p className="mt-5 max-w-xl whitespace-pre-line text-[15px] leading-[1.75] text-[#495149] sm:text-base">{product.description}</p>}
+            {product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && <p className="mt-5 max-w-xl whitespace-pre-line text-[15px] leading-[1.75] text-[#495149] sm:text-base max-sm:mt-3 max-sm:leading-6">{product.description}</p>}
             {(!product.description || product.description.trim() === "Created through governed M14 NPI to M04 catalog handoff.") && product.ingredientDeclarationText && (
-              <p className="mt-5 max-w-xl text-[15px] leading-[1.75] text-[#495149] sm:text-base">{product.ingredientDeclarationText}</p>
+              <p className="mt-5 max-w-xl text-[15px] leading-[1.75] text-[#495149] sm:text-base max-sm:mt-3 max-sm:leading-6">{product.ingredientDeclarationText}</p>
             )}
             {product.countryOfOrigin && (
-              <button type="button" onClick={() => setCountryPanelOpen(true)} className="focus-ring mt-7 inline-flex items-center gap-2 border-b border-[#C2CDC2] pb-2 text-sm font-medium text-[#173F35] transition hover:border-[#173F35]">
+              <button type="button" onClick={() => setCountryPanelOpen(true)} className="focus-ring mt-7 inline-flex items-center gap-2 border-b border-[#C2CDC2] pb-2 text-sm font-medium text-[#173F35] transition hover:border-[#173F35] max-sm:mt-3 max-sm:max-w-full">
                 <span aria-hidden="true">{countryMeta.flag}</span> Origin: {product.countryOfOrigin} <ArrowRight size={15} aria-hidden="true" />
               </button>
             )}
-            <div className="mt-10 sm:mt-12">
-              {product.isHostListing && !product.canonicalPackId
-                ? <HostListingPincodeCheck product={product} />
-                : <MarketplaceOffers product={product} />}
+            <div className="mt-5 sm:mt-6">
+              <MarketplaceOffers key={product.slug} product={product} />
             </div>
-            <a href="#ep-product-facts" className="focus-ring mt-8 inline-flex min-h-11 items-center gap-3 border-b border-[#173F35] text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42]">
+            <a href="#ep-product-facts" className="focus-ring mt-8 inline-flex min-h-11 items-center gap-3 border-b border-[#173F35] text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42] max-sm:mt-3">
               See complete product details <ArrowRight size={17} aria-hidden="true" />
             </a>
           </div>
@@ -2554,23 +2417,22 @@ export default function ProductDetailPage() {
           embedded
         />
 
-        <section id="ep-product-facts" className="scroll-mt-20 border-t border-[#D7DBD3] pt-10 sm:pt-14">
+        <section id="ep-product-facts" className="scroll-mt-20 border-t border-[#D7DBD3] pt-10 sm:pt-14 max-sm:pt-5">
           <div className="grid gap-0 border-b border-[#DDE0D9] lg:grid-cols-[minmax(260px,0.64fr)_minmax(0,1.36fr)]">
-            <div className="bg-[#E9E3F5] px-6 py-9 sm:px-9 sm:py-11">
+            <div className="bg-[#E9E3F5] px-6 py-9 sm:px-9 sm:py-11 max-sm:px-4 max-sm:py-4">
               <p className="text-sm font-semibold text-[#65567B]">01 / Product information</p>
-              <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#242638] sm:text-[42px]">Everything about<br />this product.</h2>
-              <p className="mt-5 max-w-sm text-[15px] leading-7 text-[#555268]">Published product facts, clearly presented. Information that has not been supplied is marked as not declared.</p>
+              <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#242638] sm:text-[42px] max-sm:mt-1.5 max-sm:text-[24px]">Everything about<br className="max-sm:hidden" /><span className="sm:hidden"> </span>this product.</h2>
             </div>
-            <div className="min-w-0 bg-[#FFFDF9] px-6 py-7 sm:px-9 sm:py-9">
+            <div className="min-w-0 bg-[#FFFDF9] px-6 py-7 sm:px-9 sm:py-9 max-sm:px-4 max-sm:py-2">
               {!product.isHostListing && product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && (
                 <div className="border-b border-[#DDE0D9] pb-7">
                   <h3 className="text-lg font-semibold text-[#173F35]">About this product</h3>
                   <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#4C554D]">{product.description}</p>
                 </div>
               )}
-              <dl className="grid gap-x-10 sm:grid-cols-2">
+              <dl className="grid gap-x-10 sm:grid-cols-2 max-sm:grid-cols-2 max-sm:gap-x-4">
                 {[
-                  ["Brand", product.brand?.name || "Not declared"],
+                  ["Brand", visibleProductBrand(product) || "Not declared"],
                   ["Product family", product.family?.name || "Not declared"],
                   ["Variant", product.variant?.name || "Not declared"],
                   ["Category", product.category?.name || "Not declared"],
@@ -2581,12 +2443,12 @@ export default function ProductDetailPage() {
                   ["Manufacturer / packer", product.manufacturerName || "Not declared"],
                   ["Serving size", product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : product.servingSize || "Not declared"],
                 ].map(([label, value]) => (
-                  <div key={label} className="min-w-0 border-b border-[#DEE4DF] py-4">
+                  <div key={label} className="min-w-0 border-b border-[#DEE4DF] py-4 max-sm:py-2.5">
                     <dt className="text-[13px] font-medium text-[#737970]">{label}</dt>
-                    <dd className="mt-1 break-words text-base font-semibold text-[#202421]">{value}</dd>
+                    <dd className="mt-1 break-words text-base font-semibold text-[#202421] max-sm:text-[15px] max-sm:[overflow-wrap:anywhere]">{value}</dd>
                   </div>
                 ))}
-                <div className="min-w-0 border-b border-[#DEE4DF] py-4">
+                <div className="min-w-0 border-b border-[#DEE4DF] py-4 max-sm:py-2.5">
                   <dt className="text-[13px] font-medium text-[#737970]">Country of origin</dt>
                   <dd className="mt-1">
                     {product.countryOfOrigin ? (
@@ -2596,7 +2458,7 @@ export default function ProductDetailPage() {
                     ) : <span className="font-semibold">Not declared</span>}
                   </dd>
                 </div>
-                <div className="min-w-0 border-b border-[#DEE4DF] py-4">
+                <div className="min-w-0 border-b border-[#DEE4DF] py-4 max-sm:py-2.5">
                   <dt className="text-[13px] font-medium text-[#737970]">Barcode / GTIN</dt>
                   <dd className="mt-2 min-w-0"><ProductBarcode value={product.gtin || product.barcode} compact /></dd>
                 </div>
@@ -2605,11 +2467,11 @@ export default function ProductDetailPage() {
           </div>
         </section>
 
-        <section className="grid min-w-0 items-stretch gap-6 pb-0 pt-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-8 sm:pt-10">
-          <div className="min-w-0 bg-[#EAF2F6] px-5 py-8 sm:px-8 sm:py-10">
+        <section className="grid min-w-0 items-stretch gap-6 pb-0 pt-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-8 sm:pt-10 max-sm:grid-cols-[minmax(0,1fr)] max-sm:gap-5 max-sm:pt-5">
+          <div className="min-w-0 bg-[#EAF2F6] px-5 py-8 sm:px-8 sm:py-10 max-sm:px-3 max-sm:py-4">
             <p className="text-sm font-semibold text-[#476B7C]">02 / Ingredients &amp; safety</p>
-            <h2 className="mb-2 mt-3 text-[29px] font-semibold tracking-[-0.045em] text-[#1C454D] sm:text-[36px]">Ingredients & safety</h2>
-            <p className="mb-5 max-w-lg text-sm leading-6 text-[#51666A]">
+            <h2 className="mb-2 mt-3 text-[29px] font-semibold tracking-[-0.045em] text-[#1C454D] sm:text-[36px] max-sm:mt-1.5 max-sm:text-[24px]">Ingredients & safety</h2>
+            <p className="mb-5 max-w-lg text-sm leading-6 text-[#51666A] max-sm:mb-2 max-sm:leading-5">
               Product details, ingredients and dietary information in one place.
             </p>
             <div className="min-w-0">
@@ -2908,10 +2770,10 @@ export default function ProductDetailPage() {
               )}
             </div>
           </div>
-          <div className="min-w-0 h-full border-t-[3px] border-[#66557B] bg-[#F0EAF7] px-5 pb-6 pt-7 sm:px-8 sm:pb-9 sm:pt-9">
+          <div className="min-w-0 h-full border-t-[3px] border-[#66557B] bg-[#F0EAF7] px-5 pb-6 pt-7 sm:px-8 sm:pb-9 sm:pt-9 max-sm:h-auto max-sm:px-4 max-sm:py-4">
             <p className="text-sm font-semibold text-[#355F4C]">03 / Nutrition</p>
-            <h2 className="mt-3 text-[28px] font-medium tracking-[-0.045em] text-[#202421] sm:text-4xl">Nutrition facts</h2>
-            <dl className="mt-6 grid grid-cols-2 gap-4 border-b border-[#CDD8CD] pb-5">
+            <h2 className="mt-3 text-[28px] font-medium tracking-[-0.045em] text-[#202421] sm:text-4xl max-sm:mt-1.5 max-sm:text-[24px]">Nutrition facts</h2>
+            <dl className="mt-6 grid grid-cols-2 gap-4 border-b border-[#CDD8CD] pb-5 max-sm:mt-3 max-sm:pb-3">
               <div><dt className="text-[13px] font-medium text-[#6B776C]">Basis</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : "Not declared"}</dd></div>
               <div><dt className="text-[13px] font-medium text-[#6B776C]">Serving size</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : product.servingSize || "Not declared"}</dd></div>
             </dl>
@@ -2921,7 +2783,7 @@ export default function ProductDetailPage() {
                   {product.nutrition.nutrients.map((nutrient, index) => (
                     <div
                       key={`${nutrient.nutrientKey}-${index}`}
-                      className="flex items-center justify-between gap-3 py-2.5 text-[12px] sm:gap-4 sm:py-3.5 sm:text-sm"
+                      className="flex items-center justify-between gap-3 py-2.5 text-[12px] sm:gap-4 sm:py-3.5 sm:text-sm max-sm:text-sm max-sm:py-2.5"
                     >
                       <span className="font-bold capitalize text-stone-600">
                         {nutrient.nutrientKey}
@@ -2950,7 +2812,7 @@ export default function ProductDetailPage() {
 
         <div className="space-y-6">
           {(recommendationsLoading || frequentlyBought.length > 0) && (
-          <div className="bg-[#F6F6F2] px-5 py-8 sm:px-9 sm:py-10">
+          <div className="bg-[#F6F6F2] px-5 py-8 sm:px-9 sm:py-10 max-sm:px-2 max-sm:py-4">
           <ProductRecommendationShelf
             eyebrow="More for your basket"
             title="Frequently bought"
@@ -2961,7 +2823,7 @@ export default function ProductDetailPage() {
           </div>
           )}
           {(recommendationsLoading || similarProducts.length > 0) && (
-          <div className="bg-[#F0F3EE] px-5 py-8 sm:px-9 sm:py-10">
+          <div className="bg-[#F0F3EE] px-5 py-8 sm:px-9 sm:py-10 max-sm:px-2 max-sm:py-4">
           <ProductRecommendationShelf
             eyebrow="Same shelf"
             title="Similar products"

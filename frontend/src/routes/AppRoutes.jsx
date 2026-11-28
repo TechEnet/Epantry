@@ -151,7 +151,22 @@ function writeRecipeCartFromFloating(
   }
 }
 
+function FloatingTrolleyPhoto({ item }) {
+  const photo = item.imageUrl || item.packSelection?.imageUrl || ''
+  const [failedPhoto, setFailedPhoto] = useState('')
+  if (photo && failedPhoto !== photo) {
+    return <img src={photo} alt={item.name || 'Cart item'} title={item.name || 'Cart item'}
+      className="ep-recipe-trolley-photo" draggable="false"
+      onError={() => setFailedPhoto(photo)} />
+  }
+  return <div className="ep-recipe-trolley-photo ep-recipe-trolley-placeholder" aria-label="Product photo unavailable"><ShoppingCart size={23} aria-hidden="true" /></div>
+}
+
 function GlobalFloatingCartCompanion() {
+  const location = useLocation()
+  const recipeCartSide = /^\/recipes\/[^/]+\/?$/.test(location.pathname) && location.pathname !== '/recipes/what-should-we-cook'
+  const recipeCartSideRef = useRef(recipeCartSide)
+  recipeCartSideRef.current = recipeCartSide
   const {
     isAuthenticated,
     customerEnabled,
@@ -234,7 +249,7 @@ function GlobalFloatingCartCompanion() {
           collapseTimerRef.current =
             null
         },
-        5000,
+        recipeCartSideRef.current ? 11000 : 5000,
       )
   }
 
@@ -311,12 +326,7 @@ function GlobalFloatingCartCompanion() {
                 2,
           )
 
-        const targetLeft =
-          Math.max(
-            window.innerWidth -
-              220,
-            32,
-          )
+        const targetLeft = recipeCartSideRef.current ? (window.innerWidth >= 1024 ? 32 : window.innerWidth >= 640 ? 20 : 12) + Math.min(window.innerWidth < 640 ? 320 : 420, window.innerWidth - 24, window.innerWidth < 640 ? 320 : window.innerHeight * .6) * .25 : Math.max(window.innerWidth - 220, 32)
 
         const targetTop =
           Math.max(
@@ -489,6 +499,10 @@ function GlobalFloatingCartCompanion() {
                   cartItem.packCount ||
                   1,
                 ),
+              imageUrl: cartItem.imageUrl || (snapshot.marketplaceCart?.cartId === cartId &&
+                snapshot.marketplaceCart.items?.find(previous => previous.offerId && previous.packId &&
+                  String(previous.offerId) === String(cartItem.offerId) &&
+                  String(previous.packId) === String(cartItem.packId))?.imageUrl) || '',
             }),
           )
         : []
@@ -734,6 +748,130 @@ function GlobalFloatingCartCompanion() {
           100% { opacity: 1; transform: translate3d(0, 0, 0); }
         }
 
+        @keyframes epantryCartWalkInLeft {
+          0% { opacity: 0; transform: translate3d(-140px, 0, 0); }
+          35% { opacity: 1; transform: translate3d(-78px, -3px, 0); }
+          52% { transform: translate3d(-51px, 2px, 0); }
+          70% { transform: translate3d(-27px, -2px, 0); }
+          86% { transform: translate3d(-10px, 1px, 0); }
+          100% { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
+        /* Recipe-only companion: keep the original artwork and fit photos inside its basket. */
+        .ep-recipe-trolley-stage {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 255 / 208;
+          pointer-events: none;
+        }
+        .ep-recipe-trolley-art {
+          position: absolute;
+          inset: 0;
+          display: block;
+          pointer-events: auto;
+        }
+        .ep-recipe-trolley-art img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          object-position: right bottom;
+          pointer-events: none;
+        }
+        .ep-recipe-trolley-basket {
+          position: absolute;
+          /* The basket tapers towards the base of the original artwork. */
+          left: 10%;
+          bottom: 18.5%;
+          width: 36%;
+          height: 32%;
+          display: grid;
+          grid-auto-flow: column;
+          grid-auto-columns: calc((100% - 5px) / 2);
+          grid-template-rows: minmax(0,1fr);
+          align-items: end;
+          gap: 5px;
+          padding: 2px 1px 1px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          overscroll-behavior: contain;
+          scroll-snap-type: x proximity;
+          scrollbar-width: thin;
+          scrollbar-color: #C56C42 transparent;
+          pointer-events: auto;
+          z-index: 20;
+          box-sizing: border-box;
+        }
+        .ep-recipe-trolley-basket[data-single="true"] {
+          grid-auto-columns: min(112px, 100%);
+          justify-content: center;
+          scrollbar-width: none;
+        }
+        .ep-recipe-trolley-tile {
+          min-width: 0;
+          min-height: 0;
+          height: 100%;
+          display: grid;
+          grid-template-rows: minmax(0,1fr) 22px;
+          gap: 2px;
+          overflow: hidden;
+          scroll-snap-align: start;
+        }
+        .ep-recipe-trolley-photo {
+          display: block;
+          box-sizing: border-box;
+          width: 100%;
+          height: 100%;
+          min-height: 0;
+          padding: 0;
+          object-fit: contain;
+          object-position: center bottom;
+          background: #fff;
+          border: 1px solid #D7DDCF;
+          border-radius: 8px;
+          box-shadow: 0 2px 5px #2024211A;
+        }
+        .ep-recipe-trolley-placeholder {
+          display: grid;
+          place-items: center;
+          color: #173F35;
+          background: #D7DDCF;
+        }
+        .ep-recipe-trolley-controls {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          min-width: 0;
+          height: 22px;
+          border: 1px solid #D7DDCF;
+          border-radius: 6px;
+          background: #F7F6F2;
+          color: #173F35 !important;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1;
+          box-sizing: border-box;
+        }
+        .ep-recipe-trolley-controls button {
+          display: grid;
+          place-items: center;
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+          padding: 0;
+          color: #173F35 !important;
+          border-radius: 4px;
+          background: transparent;
+        }
+        .ep-recipe-trolley-controls button:last-child { color: #963B2B !important; }
+        .ep-recipe-trolley-controls button:hover { background: #D7DDCF; }
+        .ep-recipe-trolley-controls button:disabled { opacity: .35; cursor: not-allowed; }
+        .ep-recipe-trolley-controls span { flex: 1; min-width: 0; text-align: center; color: #173F35 !important; }
+        @media (max-width: 639px) {
+          .ep-recipe-trolley-basket { grid-auto-columns: min(78px, 85%); gap: 4px; }
+          .ep-recipe-trolley-basket[data-single="true"] { grid-auto-columns: min(96px, 100%); }
+          .ep-recipe-trolley-tile { grid-template-rows: minmax(0,1fr) 22px; }
+          .ep-recipe-trolley-controls { font-size: 11px; }
+        }
         @keyframes epantryCartItemFly {
           0% { opacity: 0; transform: translate3d(0, 0, 0) scale(.72); }
           14% { opacity: 1; transform: translate3d(0, -10px, 0) scale(1); }
@@ -773,7 +911,7 @@ function GlobalFloatingCartCompanion() {
           to={
             cartHref
           }
-          className="focus-ring fixed bottom-5 right-5 z-[80] grid h-14 w-14 place-items-center rounded-full border border-emerald-200 bg-emerald-700 text-white shadow-[0_16px_38px_rgba(6,78,59,0.28)] transition hover:scale-[1.03] hover:bg-emerald-800 lg:right-8"
+          className={`focus-ring fixed bottom-5 z-[80] grid h-14 w-14 place-items-center rounded-full border border-emerald-200 bg-emerald-700 text-white shadow-[0_16px_38px_rgba(6,78,59,0.28)] transition hover:scale-[1.03] hover:bg-emerald-800 ${recipeCartSide ? 'left-5 lg:left-8' : 'right-5 lg:right-8'}`}
           aria-label="Open EPANTRY cart"
           title="Open cart"
         >
@@ -809,13 +947,47 @@ function GlobalFloatingCartCompanion() {
         !hidden &&
         !collapsed && (
         <aside
-          className="pointer-events-none fixed bottom-4 right-3 z-[80] w-[min(285px,calc(100vw-1.5rem))] sm:bottom-5 sm:right-5 lg:right-8"
+          className={`pointer-events-none fixed bottom-4 z-[80] sm:bottom-5 ${recipeCartSide ? 'left-3 sm:left-5 lg:left-8 w-[min(320px,calc(100vw-1.5rem))] sm:w-[min(420px,calc(100vw-2.5rem),60vh)]' : 'right-3 sm:right-5 lg:right-8 w-[min(285px,calc(100vw-1.5rem))]'}`}
           style={{
             animation:
-              'epantryCartWalkIn 720ms cubic-bezier(.2,.78,.2,1) both',
+              `${recipeCartSide ? 'epantryCartWalkInLeft' : 'epantryCartWalkIn'} 720ms cubic-bezier(.2,.78,.2,1) both`,
           }}
           aria-label="EPANTRY floating cart"
         >
+          {recipeCartSide ? (
+            <div className="ep-recipe-trolley-stage">
+              <button type="button" onClick={closeCompanion}
+                className="focus-ring pointer-events-auto absolute right-1 top-1 z-30 grid h-8 w-8 place-items-center rounded-full border border-[#D7DDCF] bg-[#F7F6F2] text-[#173F35] shadow-sm"
+                aria-label="Hide floating cart">
+                <X size={16} aria-hidden="true" />
+              </button>
+              <Link to={cartHref} className="focus-ring ep-recipe-trolley-art rounded-[24px]" aria-label="Open EPANTRY cart" title="Open cart">
+                <img src="/video/cart.png" alt="EPANTRY shopping cart companion" draggable="false" />
+              </Link>
+              <div className="ep-recipe-trolley-basket" data-single={items.length === 1 ? 'true' : 'false'} aria-label="Cart products" tabIndex={0}>
+                {[...items].reverse().map(item => (
+                  <div key={`${item.cartKind}-${item.itemKey}`} className="ep-recipe-trolley-tile" aria-label={item.name || 'Cart item'}>
+                    <FloatingTrolleyPhoto item={item} />
+                    <div className="ep-recipe-trolley-controls">
+                      {item.cartKind === 'marketplace' && (
+                        <button type="button" className="focus-ring" aria-label={`Decrease ${item.name || 'item'} quantity`}
+                          disabled={Number(item.quantity || 1) <= 1 || Boolean(updatingItemKey)}
+                          onClick={() => updateMarketplaceItem(item, 'decrement')}>
+                          <Minus size={12} strokeWidth={2.4} aria-hidden="true" />
+                        </button>
+                      )}
+                      <span aria-label="Pack quantity">{item.cartKind === 'recipe' ? (item.packSelection?.packCount || 1) : Number(item.quantity || 1)}</span>
+                      <button type="button" className="focus-ring" aria-label={`Remove ${item.name || 'item'} from cart`}
+                        disabled={item.cartKind === 'marketplace' && Boolean(updatingItemKey)}
+                        onClick={() => item.cartKind === 'marketplace' ? updateMarketplaceItem(item, 'remove') : removeRecipeItem(item)}>
+                        <X size={12} strokeWidth={2.4} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
           <div className="pointer-events-auto relative min-h-[225px]">
             <button
               type="button"
@@ -848,15 +1020,12 @@ function GlobalFloatingCartCompanion() {
             </Link>
 
             <div className="absolute bottom-[50px] left-[18px] z-20 flex h-[82px] w-[132px] flex-col justify-end gap-1 overflow-hidden px-0.5 pb-0.5">
-              {items
-                .slice(
-                  -3,
-                )
+              {items.slice(-3)
                 .map(
                   (item) => (
                     <div
                       key={`${item.cartKind}-${item.itemKey}`}
-                      className="flex min-h-[22px] items-center gap-1 rounded-[7px] border border-emerald-700/20 bg-white/95 px-1.5 py-1 shadow-[0_3px_9px_rgba(15,23,42,0.14)] backdrop-blur-sm"
+                      className="flex items-center gap-1 rounded-[7px] border border-emerald-700/20 bg-white/95 shadow-[0_3px_9px_rgba(15,23,42,0.14)] backdrop-blur-sm min-h-[22px] px-1.5 py-1"
                     >
                       <p
                         className="min-w-0 flex-1 overflow-hidden break-words pr-0.5 text-[7px] font-black leading-[9px] text-emerald-950"
@@ -958,6 +1127,7 @@ function GlobalFloatingCartCompanion() {
               )}
             </div>
           </div>
+          )}
         </aside>
       )}
     </>

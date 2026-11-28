@@ -30,6 +30,8 @@ import { assertEuTraderReady, publicTrader } from '../dsa/dsa.trader.service.js'
 import { DsaTraderProfile } from '../dsa/dsa.models.js'
 import { needsCommercialPublication, publishApprovedListingForSale } from './hostUnifiedListing.autoPublish.service.js'
 
+import { loadRecipeIngredientIdentities, resolveIngredientIdentity, syncApprovedRecipeIngredientIdentities } from './hostRecipeIngredientIdentity.service.js'
+
 const router = Router()
 const SECTIONS = new Set(['details', 'media', 'ingredients', 'steps', 'nutrition', 'selling', 'delivery'])
 const adminSecurity = [sensitiveResponseNoStoreMiddleware, rejectPrivilegedImpersonation, authenticateSession, loadCurrentUser, requireActiveAccount, loadAdminAuthorization, requireAdminAccess, requireMfaAssurance]
@@ -943,6 +945,15 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
     )
     if (!record) problem('Only a submitted listing can be reviewed. Refresh the queue.', 409)
   }
+  // Approval already completed; link only exact approved grocery/recipe names.
+  // Keep the approval response authoritative if optional identity sync fails.
+  if (decision === 'approved') {
+    try {
+      await syncApprovedRecipeIngredientIdentities({ apply: true, listingId: record._id, reviewerId })
+    } catch (error) {
+      console.error('[approved recipe ingredient identity sync]', error?.message || String(error))
+    }
+  }
   await createNotificationIntentBestEffort({
     userId: record.ownerUserId, category: 'operations', triggerType: 'host_unified_listing_review',
     reasonCode: `host_unified_listing_${decision}`,
@@ -1151,43 +1162,15 @@ router.get('/public/country-discovery/:countryName', wrap(async (req, res) => {
 
 // For a published Host recipe, resolve EACH ingredient against the active EPANTRY
 // catalog before allowing its customer Pantry/Recipe Cart actions. Host-provided
-// IDs are never trusted on their own: the saved ingredient name must also match.
-function ingredientIdentityKey(value) {
-  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]/g, '')
-}
+// Public detail and server-side shopping use the SAME governed identity resolver.
 async function publicListingWithIngredientIdentities(record) {
   const approved = publishedHostRecord(record)
   const published = await approvedPublicProjection(record)
   if (approved.type === 'grocery' || !published.ingredients?.length) return published
   const original = (approved.packet?.ingredients || []).slice(0, 100)
-  const ids = [...new Set(original.map(line => String(line?.canonicalIngredientId || '').trim())
-    .filter(value => objectId(value)))]
-  const names = [...new Set(original.map(line => String(line?.name || '').trim())
-    .filter(value => value.length >= 2 && value.length <= 200))]
-  const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const exactNames = names.map(name => new RegExp(`^\\s*${escapeRegex(name).replace(/\\ /g, '\\s+')}\\s*$`, 'i'))
-  const conditions = []
-  if (ids.length) conditions.push({ _id: { $in: ids } })
-  if (exactNames.length) {
-    conditions.push({ canonicalName: { $in: exactNames } }, { aliases: { $in: exactNames } })
-  }
-  if (!conditions.length) return published
-  const catalog = await CanonicalIngredient.find({ status: 'active', $or: conditions })
-    .select('_id canonicalName aliases slug').lean()
-  const resolved = original.map(line => {
-    const inputKey = ingredientIdentityKey(line?.name)
-    if (!inputKey) return ''
-    const possible = catalog.filter(item => [item.canonicalName, ...(item.aliases || [])]
-      .some(name => ingredientIdentityKey(name) === inputKey))
-    // Never guess between ambiguous canonical matches.
-    const savedId = String(line?.canonicalIngredientId || '').trim()
-    const byId = possible.find(item => String(item._id) === savedId)
-    const match = byId || (possible.length === 1 ? possible[0] : null)
-    return match ? String(match._id) : ''
-  })
+  const catalog = await loadRecipeIngredientIdentities(original)
   return { ...published, ingredients: published.ingredients.map((line, index) => ({
-    ...line, canonicalIngredientId: resolved[index] || '',
+    ...line, canonicalIngredientId: String(resolveIngredientIdentity(original[index], catalog)?._id || ''),
   })) }
 }
 
@@ -1284,20 +1267,27 @@ router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
   const declaredPrice = rawPrice !== null && rawPrice !== undefined && Number.isFinite(Number(rawPrice)) && Number(rawPrice) >= 0 ? Number(rawPrice) : null
   let offers = []
   let packId = null
-  if (declaredCoverage) {
-    if (catalog?.packId && organization) {
-      const ownedOffers = await HostOffer.find({ organizationId: organization._id, packId: catalog.packId, status: 'active' })
-        .select('_id').lean()
-      if (ownedOffers.length) {
-        const ownedIds = new Set(ownedOffers.map(item => String(item._id)))
-        const marketplace = await listPublicEligibleOffers({ packId: catalog.packId, pincode, fulfillmentType: 'delivery' })
+  if (!pickupOnly && organization) {
+    // Auto-published, barcode-free listings may have an active marketplace offer
+    // even when the older catalog identity resolver returns null. Recover only
+    // the exact listing-owned offer; never search by product title or guess a pack.
+    const exact = await HostOffer.find({ organizationId: organization._id,
+      merchantSku: `epantry-${String(record._id)}`, status: 'active' }).select('_id packId').lean()
+    const exactPacks = [...new Set(exact.map(row => String(row.packId || '')).filter(objectId))]
+    const resolvedPack = exactPacks.length === 1 ? exactPacks[0] : exactPacks.length === 0 && declaredCoverage ? catalog?.packId : null
+    if (resolvedPack) {
+      const owned = exact.length ? exact.filter(row => String(row.packId) === String(resolvedPack)) :
+        await HostOffer.find({ organizationId: organization._id, packId: resolvedPack, status: 'active' }).select('_id').lean()
+      const ownedIds = new Set(owned.map(row => String(row._id)))
+      if (ownedIds.size) {
+        const marketplace = await listPublicEligibleOffers({ packId: resolvedPack, pincode, fulfillmentType: 'delivery' })
         offers = (marketplace.offers || []).filter(offer => ownedIds.has(String(offer.id)))
           .sort((a, b) => Number(a.price?.effectiveAmountMinor ?? Infinity) - Number(b.price?.effectiveAmountMinor ?? Infinity))
-        if (offers.length) packId = catalog.packId
+        if (offers.length) packId = String(resolvedPack)
       }
     }
   }
-  respond(res, { pincode, declaredCoverage, pickupOnly, declaredPrice: declaredCoverage ? declaredPrice : null,
+  respond(res, { pincode, declaredCoverage: declaredCoverage || offers.length > 0, pickupOnly, declaredPrice: declaredCoverage ? declaredPrice : null,
     priceSource: 'host_declared_unverified', packId, offers, purchasable: offers.length > 0 })
 }))
 

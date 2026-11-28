@@ -1,4 +1,8 @@
 import mongoose from 'mongoose'
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+import { publicHostListingFilter, publishedHostRecord } from '../hostOperations/hostUnifiedListing.public.js'
+import { ingredientKey, listGroceryBackedVersionIds } from '../hostOperations/hostRecipeIngredientIdentity.service.js'
+import { buildPublicProductSlug, getPublicProductBySlug } from '../catalog/catalog.public.service.js'
 import { InventoryReservation } from './commerce.transaction.models.js'
 
 import {
@@ -9,6 +13,8 @@ import {
   CanonicalIngredient,
   Pack,
   ProductVersion,
+  ProductVariant,
+  ProductFamily,
 } from '../catalog/catalog.models.js'
 
 import {
@@ -246,6 +252,7 @@ async function findConservativeProductVersions({
       .select({
         canonicalName: 1,
         aliases: 1,
+        attributes: 1,
       })
       .lean()
 
@@ -291,8 +298,24 @@ async function findConservativeProductVersions({
       )
       .filter(Boolean)
 
-  const identityFilter = {
+  // Support punctuation/whitespace variants of the same complete product name.
+  // Anchored exact-name patterns are additional to the original token rules;
+  // no approximate title/substring fallback is added for purchasing.
+  for (const name of uniqueIdentityNames) {
+    const words = ingredientKey(name).split(' ').filter(Boolean)
+    if (!words.length) continue
+    const core = words.map(escapeRegex).join('[^a-z0-9]+')
+    nameRegexes.push(new RegExp(`^\\s*${core}[^a-z0-9]*(?:\\d+(?:\\.\\d+)?\\s*(?:kg|g|gm|grams?|ml|l|litres?|liters?|oz|lb|pieces?|pcs|packs?))?\\s*$`, 'i'))
+  }
+
+  const groceryBacked = Boolean(ingredient.attributes?.approvedGroceryIdentity)
+  const approvedVersionIds = await listGroceryBackedVersionIds(ingredient, now)
+  if (groceryBacked && !approvedVersionIds.length) return []
+  const approvedVersionSet = new Set(approvedVersionIds.map(String))
+
+  const identityFilter = groceryBacked ? { _id: { $in: approvedVersionIds } } : {
     $or: [
+      ...(approvedVersionIds.length ? [{ _id: { $in: approvedVersionIds } }] : []),
       ...nameRegexes.map(
         (nameRegex) => ({
           displayName: {
@@ -328,6 +351,7 @@ async function findConservativeProductVersions({
         packId: 1,
         displayName: 1,
         netQuantity: 1,
+        images: 1,
         ingredients: 1,
         publishedAt: 1,
         version: 1,
@@ -341,7 +365,7 @@ async function findConservativeProductVersions({
           version,
 
           matchMethod:
-            detectProductMatchMethod({
+            approvedVersionSet.has(String(version._id)) ? 'canonical_name_token' : detectProductMatchMethod({
               version,
               canonicalIngredientId,
               nameRegexes,
@@ -687,11 +711,57 @@ async function resolveServiceableOfferCapacity({
 // Discover real approved, stocked delivery listings without a customer PIN.
 // The result is informational, not a quote or a reservation. Checkout still
 // uses matchRequirementToMarketplace and the original PIN-specific guards.
-export async function listRecipeIngredientPacks({ canonicalIngredientIds, now = new Date() }) {
+// The optional PIN checks offer-level delivery/stock, independently of recipe
+// units and the number of packs needed. The original quote remains mandatory.
+export async function listRecipeIngredientPacks({ canonicalIngredientIds, pincode, now = new Date() }) {
+  const pin = pincode ? normalizePostalCode(pincode) : null
+  if (pincode && !/^[1-9][0-9]{5}$/.test(String(pin || ''))) {
+    throw new ApiError(400, 'Enter a valid 6-digit Indian delivery PIN.')
+  }
+  const deliveryLookups = new Map()
+  const photoLookups = new Map()
+  const catalogPhotoLookups = new Map()
+  const imageUrl = value => {
+    const url = typeof value === 'string' ? value : value?.url || value?.imageUrl
+    return typeof url === 'string' && /^(https?:\/\/|\/(?!\/))/i.test(url) ? url : ''
+  }
+  const firstImage = images => (Array.isArray(images) ? images : []).map(imageUrl).find(Boolean) || ''
+  async function approvedOfferPhotos(offers, version) {
+    const ids = [...new Set(offers.map(offer => /^epantry-([a-f0-9]{24})$/i.exec(String(offer.merchantSku || ''))?.[1]).filter(Boolean))]
+    if (!ids.length) return new Map()
+    const records = await HostUnifiedListingPacket.find(publicHostListingFilter({ _id: { $in: ids } }))
+      .select('_id status type publishedType packet publishedPacket').lean()
+    return new Map(records.map(publishedHostRecord)
+      .filter(row => row.type === 'grocery' && String(row.packet?.catalogProductVersionId) === String(version._id))
+      .map(row => {
+        const images = Array.isArray(row.packet.images) ? row.packet.images : []
+        const urls = images.map(imageUrl).filter(Boolean)
+        const front = (Array.isArray(row.packet.imageRoles) ? row.packet.imageRoles : [])
+          .find(entry => entry?.role === 'front_of_pack' && urls.includes(imageUrl(entry)))
+        return [`epantry-${row._id}`, imageUrl(front) || firstImage(images)]
+      }))
+  }
+  // Same governed image read as Grocery, including privacy-cleared evidence
+  // photographs when ProductVersion.images is empty. Never search by title.
+  async function groceryCatalogPhoto(version, packId) {
+    const original = firstImage((version.images || []).slice().sort((a,b) => Number(a?.sortOrder || 0)-Number(b?.sortOrder || 0)))
+    if (original) return original
+    const pack = await Pack.findById(packId).select('variantId packKey').lean()
+    if (!pack?.variantId) return ''
+    const variant = await ProductVariant.findById(pack.variantId).select('familyId variantKey').lean()
+    if (!variant?.familyId) return ''
+    const family = await ProductFamily.findById(variant.familyId).select('slug').lean()
+    const slug = buildPublicProductSlug({ familySlug: family?.slug, variantKey: variant.variantKey, packKey: pack.packKey })
+    if (!slug) return ''
+    const product = await getPublicProductBySlug(slug)
+    if (String(product?.productVersionId) !== String(version._id) || String(product?.packId) !== String(packId)) return ''
+    return imageUrl(product.image) || firstImage(product.images)
+  }
   const packsByIngredient = Object.create(null)
   // Deduplicate repeated versions and offers. Never use a historic version's size.
   const publicLookups = new Map()
-  for (const canonicalIngredientId of new Set(canonicalIngredientIds.map(String))) {
+  const ids = [...new Set(canonicalIngredientIds.map(String))]
+  async function loadOne(canonicalIngredientId) {
     const rows = []
     const seen = new Set()
     const versions = await findConservativeProductVersions({ canonicalIngredientId, now })
@@ -708,6 +778,18 @@ export async function listRecipeIngredientPacks({ canonicalIngredientIds, now = 
       }
       const result = await publicLookups.get(packId)
       if (!result || result.productVersionId !== stringifyId(version._id)) continue
+      if (!photoLookups.has(packId)) photoLookups.set(packId, approvedOfferPhotos(result.offers || [], version).catch(() => new Map()))
+      const photos = await photoLookups.get(packId)
+      // Only fall back to the exact public catalog version when an offer has
+      // no approved Host photograph. Never copy another seller's upload.
+      if ((result.offers || []).some(offer => !photos.get(String(offer.merchantSku || ''))) && !catalogPhotoLookups.has(packId)) {
+        catalogPhotoLookups.set(packId, groceryCatalogPhoto(version, packId).catch(() => ''))
+      }
+      const catalogPhoto = catalogPhotoLookups.has(packId) ? await catalogPhotoLookups.get(packId) : ''
+      if (pin && !deliveryLookups.has(packId)) {
+        deliveryLookups.set(packId, listPublicEligibleOffers({ packId, pincode: pin, fulfillmentType: 'delivery' }).then(value => new Set((value.offers || []).map(offer => String(offer.id)))))
+      }
+      const deliverableOffers = pin ? await deliveryLookups.get(packId) : null
       for (const offer of result.offers || []) {
         if (seen.has(String(offer.id))) continue
         const amountMinor = Number(offer.price?.effectiveAmountMinor)
@@ -718,14 +800,30 @@ export async function listRecipeIngredientPacks({ canonicalIngredientIds, now = 
         const maximumPackCount = Math.min(100000, Math.floor(capacity.sellableQuantity),
           offer.maximumOrderQuantity == null ? 100000 : Math.floor(Number(offer.maximumOrderQuantity)))
         if (!Number.isSafeInteger(maximumPackCount) || maximumPackCount < minimumPackCount) continue
+        let deliveryAvailable = null
+        let deliveryMaximumPackCount = null
+        if (pin) {
+          deliveryMaximumPackCount = 0
+          if (deliverableOffers.has(String(offer.id))) {
+            const deliveryCapacity = await resolveServiceableOfferCapacity({ offerId: offer.id, pincode: pin, fulfillmentType: 'delivery' })
+            deliveryMaximumPackCount = Math.max(0, Math.min(maximumPackCount, Math.floor(deliveryCapacity.sellableQuantity)))
+          }
+          deliveryAvailable = deliveryMaximumPackCount >= minimumPackCount
+        }
         seen.add(String(offer.id))
         rows.push({ offerId: String(offer.id), packId, productVersionId: stringifyId(version._id),
           productDisplayName: version.displayName || '', sellerName: offer.seller?.name || 'Marketplace Host',
+          imageUrl: photos.get(String(offer.merchantSku || '')) || catalogPhoto,
           packQuantity, packUnit, minimumPackCount, maximumPackCount,
+          ...(pin ? { deliveryAvailable, deliveryMaximumPackCount } : {}),
           unitPrice: { amountMinor, currency } })
       }
     }
     packsByIngredient[canonicalIngredientId] = rows.sort((a,b) => a.packUnit.localeCompare(b.packUnit) || a.packQuantity-b.packQuantity || a.unitPrice.amountMinor-b.unitPrice.amountMinor)
+  }
+  // Avoid serial database round trips for an entire recipe. Keep concurrency bounded.
+  for (let i = 0; i < ids.length; i += 4) {
+    await Promise.all(ids.slice(i, i + 4).map(loadOne))
   }
   return { packsByIngredient }
 }

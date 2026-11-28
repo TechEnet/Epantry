@@ -301,9 +301,9 @@ function getPantryLineStatus(
 }
 
 // The discovery endpoint is independent of delivery PIN and never reserves stock.
-async function loadIngredientPackAvailability(ids) {
+async function loadIngredientPackAvailability(ids, pincode) {
   const response = await apiClient.get('/recipe-ingredient-packs', {
-    params: { ingredientIds: ids.join(',') },
+    params: { ingredientIds: ids.join(','), ...(pincode ? { pincode } : {}) },
   })
   const result = response?.data?.data?.packsByIngredient
   if (!result || typeof result !== 'object' || ids.some(id => !Array.isArray(result[id]))) {
@@ -316,34 +316,74 @@ function packKey(row) {
   return `${row.offerId}:${row.packId}:${row.productVersionId}`
 }
 
+// UI suggestion only; the backend quote is authoritative for conversion and purchase.
+function ingredientPackAmount(row, unit) {
+  const quantity = Number(row?.packQuantity)
+  if (!Number.isFinite(quantity) || quantity <= 0) return null
+  const from = row.packUnit
+  if (from === unit) return quantity
+  const mass = { mg: 0.001, g: 1, kg: 1000 }
+  const volume = { ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 240 }
+  for (const scale of [mass, volume]) {
+    if (Object.hasOwn(scale, from) && Object.hasOwn(scale, unit)) return quantity * scale[from] / scale[unit]
+  }
+  return null
+}
+
+function isUnmeasuredIngredientPack(row, unit) {
+  return ['piece', 'dozen'].includes(row?.packUnit) && ['mg', 'g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup'].includes(unit)
+}
+
+function IngredientOfferPhoto({ url, name }) {
+  const [stage, setStage] = useState(0)
+  useEffect(() => setStage(0), [url])
+  return <span className="ep-pack-photo">{url && stage < 2 ? <img key={`${url}:${stage}`} {...(stage === 0 ? publicImageProps(url, { widths: [160, 320], sizes: '88px' }) : { src: url })} alt={name} loading="lazy" onError={()=>setStage(value=>value+1)}/> : <span><ShoppingCart size={20} aria-hidden="true"/>Photo unavailable</span>}</span>
+}
+
 function IngredientPackDialog({ request, onFinish }) {
   const ref = useRef(null)
   const [pin, setPin] = useState(() => /^\d{6}$/.test(String(request.savedSelection?.pincode || '')) ? String(request.savedSelection.pincode) : '')
   const [busy, setBusy] = useState(false)
+  const addingRef = useRef(false)
+  const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
   const [checkedPin, setCheckedPin] = useState('')
   const [verified, setVerified] = useState({})
+  const [deliveryRows, setDeliveryRows] = useState({})
   const candidates = request.packs || []
   const saved = request.savedSelection
   const exact = candidates.find(row => row.packUnit === request.unit && Number(row.packQuantity) === Number(request.quantity) && row.minimumPackCount <= 1)
   const initial = candidates.find(row => saved && packKey(row) === packKey(saved)) || exact || candidates[0]
   const [selectedKey, setSelectedKey] = useState(() => initial ? packKey(initial) : '')
-  const initialCount = row => Math.min(row.maximumPackCount, Math.max(row.minimumPackCount,
-    row.packUnit === request.unit ? Math.ceil(request.quantity / row.packQuantity) : 1))
+  const initialCount = row => {
+    const amount = ingredientPackAmount(row, request.unit)
+    return Math.min(row.maximumPackCount, Math.max(row.minimumPackCount, amount ? Math.ceil(request.quantity / amount) : 1))
+  }
   const [count, setCount] = useState(() => initial ? (saved && packKey(initial) === packKey(saved) && saved.packCount >= initial.minimumPackCount && saved.packCount <= initial.maximumPackCount ? saved.packCount : initialCount(initial)) : 1)
   const sequence = useRef(0)
   const choice = candidates.find(row => packKey(row) === selectedKey)
   const quoteChoice = checkedPin === pin.trim() ? verified[selectedKey] : null
+  const deliveryChoice = checkedPin === pin.trim() ? deliveryRows[selectedKey] : null
+  const amount = choice ? ingredientPackAmount(choice, request.unit) : null
+  const suggestedCount = amount ? Math.max(choice.minimumPackCount, Math.ceil(request.quantity / amount)) : null
   const minCount = choice ? Math.max(choice.minimumPackCount, quoteChoice?.packCount || 1) : 1
-  const maxCount = choice ? Math.min(choice.maximumPackCount, quoteChoice?.maximumPackCount ?? choice.maximumPackCount) : 0
+  const maxCount = choice ? Math.min(choice.maximumPackCount, quoteChoice?.maximumPackCount ?? choice.maximumPackCount, deliveryChoice?.deliveryAvailable ? deliveryChoice.deliveryMaximumPackCount : choice.maximumPackCount) : 0
   const supplied = quoteChoice ? Math.round(quoteChoice.packQuantityInRequirementUnit * count * 1000000) / 1000000 : 0
   const extra = quoteChoice ? Math.round((supplied - quoteChoice.requirementQuantity) * 1000000) / 1000000 : 0
-  const valid = Boolean(!busy && choice && quoteChoice && count >= minCount && count <= maxCount && extra >= 0)
+  const valid = Boolean(!busy && !adding && choice && deliveryChoice?.deliveryAvailable && quoteChoice && count >= minCount && count <= maxCount && extra >= 0)
   const checkDelivery = async (postalCode) => {
     const ticket = ++sequence.current
-    setVerified({}); setCheckedPin(''); setError(''); setBusy(true)
+    setVerified({}); setDeliveryRows({}); setCheckedPin(''); setError(''); setBusy(true)
     try {
-      if (!/^\d{6}$/.test(postalCode)) throw new Error('Enter a valid 6-digit Indian delivery PIN.')
+      if (!/^[1-9]\d{5}$/.test(postalCode)) throw new Error('Enter a valid 6-digit Indian delivery PIN.')
+      const availability = await loadIngredientPackAvailability([request.canonicalIngredientId], postalCode)
+      if (ticket !== sequence.current) return
+      const liveRows = availability[request.canonicalIngredientId] || []
+      if (liveRows.some(row => typeof row.deliveryAvailable !== 'boolean')) throw new Error('Delivery service did not return a verified result.')
+      setDeliveryRows(Object.fromEntries(liveRows.map(row => [packKey(row), row])))
+      setCheckedPin(postalCode)
+      // Do not mistake a failed quantity conversion for an unavailable PIN.
+      if (!liveRows.some(row => row.deliveryAvailable && !isUnmeasuredIngredientPack(row, request.unit))) return
       const outcome = await createRecipeOutcomePlan(request.slug, {
         targetServings: request.servings, purchaseMode: request.purchaseMode,
         selectedCanonicalIngredientIds: [request.canonicalIngredientId],
@@ -359,7 +399,7 @@ function IngredientPackDialog({ request, onFinish }) {
         Number.isSafeInteger(row.packCount) && row.packCount > 0 && row.maximumPackCount >= row.packCount &&
         row.packQuantityInRequirementUnit > 0 && row.requirementQuantity > 0 && Number.isInteger(row.unitPrice?.amountMinor))
       const next = Object.fromEntries(rows.map(row => [packKey(row), row]))
-      setVerified(next); setCheckedPin(postalCode)
+      setVerified(next)
       // Keep the customer-selected offer and count; prompt for changes if needed.
     } catch (err) {
       if (ticket === sequence.current) setError(getCommerceErrorMessage(err, err?.message || 'Unable to verify delivery. Please try again.'))
@@ -379,32 +419,195 @@ function IngredientPackDialog({ request, onFinish }) {
     }).catch(() => {})
     return () => { active = false; sequence.current++; if (dialog?.open) dialog.close() }
   }, [])
-  const price = quoteChoice?.unitPrice || choice?.unitPrice
+  const price = quoteChoice?.unitPrice || deliveryChoice?.unitPrice || choice?.unitPrice
   const selectRow = row => {
     setSelectedKey(packKey(row))
     const checked = checkedPin === pin.trim() ? verified[packKey(row)] : null
     setCount(checked ? checked.packCount : initialCount(row))
   }
-  return <dialog ref={ref} aria-labelledby="ingredient-pack-title" onCancel={event => { event.preventDefault(); onFinish(null) }}
-    style={{position:'fixed',inset:0,margin:'auto',width:'min(620px, calc(100% - 24px))',maxHeight:'88dvh',overflow:'auto',padding:0,border:'1px solid #D7DDCF',borderRadius:16,background:'#F7F6F2',color:'#202421',boxShadow:'0 20px 70px #20242155'}}>
-    <style>{`dialog[aria-labelledby="ingredient-pack-title"]::backdrop{background:#20242199} dialog[aria-labelledby="ingredient-pack-title"]:focus{outline:none} .ep-ingredient-pack-option{display:flex;align-items:flex-start;gap:12px;padding:14px;border-bottom:1px solid #D7DDCF;cursor:pointer} .ep-ingredient-pack-option strong,.ep-ingredient-pack-option p{color:#202421!important} .ep-ingredient-pack-btn{background:#C56C42!important;color:#202421!important;border-radius:8px;padding:10px 16px;font-weight:700;min-height:42px} .ep-ingredient-pack-btn:disabled{opacity:.5;cursor:not-allowed}`}</style>
-    <header style={{background:'#C56C42',padding:'18px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><div><h2 id="ingredient-pack-title" style={{fontSize:24,fontWeight:750,color:'#202421'}}>Choose packs</h2><p style={{color:'#202421',fontSize:16}}>{request.name}</p></div><button type="button" aria-label="Close pack selection" onClick={()=>onFinish(null)} style={{background:'#F7F6F2',color:'#202421',padding:10,borderRadius:8}}><X size={20}/></button></header>
-    <div style={{padding:20}}>
-      <div style={{background:'#D7DDCF',padding:12,borderRadius:8,fontWeight:700,color:'#173F35'}}>Required: {quoteChoice?.requirementQuantity ?? request.quantity} {quoteChoice?.requirementUnit || request.unit}</div>
-      <h3 style={{fontSize:17,fontWeight:700,margin:'16px 0 2px',color:'#202421'}}>Available on EPANTRY</h3>
-      {candidates.map(row=>{const checked = checkedPin === pin.trim() ? verified[packKey(row)] : null; return <label className="ep-ingredient-pack-option" key={packKey(row)} style={{background:selectedKey===packKey(row)?'#C56C421A':'transparent'}}><input type="radio" name="ingredient-pack" checked={selectedKey===packKey(row)} disabled={busy} onChange={()=>selectRow(row)} style={{accentColor:'#173F35',marginTop:5}}/><div style={{flex:1,minWidth:0}}><strong>{row.packQuantity} {row.packUnit} pack</strong><p style={{fontSize:14,overflowWrap:'anywhere'}}>{row.productDisplayName || request.name} · {row.sellerName}</p><p style={{fontSize:14}}>{checked ? `${checked.maximumPackCount} max orderable · ${checked.packCount} needed` : `${row.maximumPackCount} listed stock limit · PIN not verified`}</p>{checkedPin && <p style={{fontSize:14,fontWeight:600}}>{checked ? 'Delivery verified for this PIN' : 'Required quantity not verified for this PIN'}</p>}</div><strong style={{whiteSpace:'nowrap'}}>{formatMoney(checked?.unitPrice || row.unitPrice)}</strong></label>})}
-      {choice && <><div style={{display:'flex',alignItems:'center',gap:12,marginTop:16,flexWrap:'wrap'}}><button type="button" aria-label="Decrease packs" disabled={busy || count<=choice.minimumPackCount} onClick={()=>setCount(v=>v-1)} style={{border:'1px solid #D7DDCF',padding:10,borderRadius:8,color:'#173F35'}}><Minus size={18}/></button><output style={{fontWeight:700}}>{count}</output><button type="button" aria-label="Increase packs" disabled={busy || count>=maxCount} onClick={()=>setCount(v=>v+1)} style={{border:'1px solid #D7DDCF',padding:10,borderRadius:8,color:'#173F35'}}><Plus size={18}/></button><strong style={{marginLeft:'auto',color:'#173F35'}}>{formatMoney({...price,amountMinor:price.amountMinor*count})}</strong></div>
-        <p aria-live="polite" style={{marginTop:12,color:'#173F35'}}>Selected: {formatQuantity(choice.packQuantity*count)} {choice.packUnit}{quoteChoice ? ` · ${extra===0?'Exact quantity':extra>0?`${extra} ${quoteChoice.requirementUnit} extra`:`${-extra} ${quoteChoice.requirementUnit} still needed`}` : ''}</p></>}
-      <div style={{borderTop:'1px solid #D7DDCF',marginTop:20,paddingTop:16}}>
-        <h3 style={{fontSize:17,fontWeight:700,marginBottom:8,color:'#202421'}}>Check delivery availability</h3>
-        <form onSubmit={event=>{event.preventDefault();void checkDelivery(pin.trim())}} style={{display:'flex',gap:8,alignItems:'end',flexWrap:'wrap'}}><label style={{flex:'1 1 160px',fontSize:14,fontWeight:600,color:'#202421'}}>Delivery PIN<input aria-label="Delivery PIN" inputMode="numeric" maxLength={6} value={pin} disabled={busy} onChange={event=>{setPin(event.target.value.replace(/\D/g,''));setVerified({});setCheckedPin('');setError('')}} style={{display:'block',width:'100%',background:'#fff',color:'#202421',border:'1px solid #D7DDCF',borderRadius:8,padding:10,marginTop:4}}/></label><button className="ep-ingredient-pack-btn" disabled={busy || !/^\d{6}$/.test(pin)} type="submit">Check delivery</button></form>
-        {busy && <p role="status" style={{color:'#173F35',padding:'12px 0'}}>Checking delivery and stock...</p>}
-        {error && <p role="alert" style={{color:'#8F3226',padding:12,background:'#F7E6DD',borderRadius:8,marginTop:10}}>{error}</p>}
-        {!busy && checkedPin && <p role="status" style={{marginTop:10,fontWeight:600,color:quoteChoice?'#173F35':'#8F3226'}}>{quoteChoice ? `Delivery available for ${checkedPin}. ${count < minCount ? `Select at least ${minCount} packs.` : count > maxCount ? `Only ${maxCount} packs can be ordered.` : ''}` : `The selected pack cannot be confirmed for the required quantity at ${checkedPin}. Choose another pack or PIN.`}</p>}
-        {!busy && checkedPin && !quoteChoice && <button type="button" onClick={()=>{onFinish(null);openAvailabilityNotifyModal({query:request.name,displayName:request.name,canonicalIngredientId:request.canonicalIngredientId,source:'recipe'})}} style={{color:'#173F35',fontWeight:700,textDecoration:'underline',marginTop:8}}>Notify me when available</button>}
+  const pinChecked = Boolean(checkedPin && checkedPin === pin.trim())
+  const coverageOk = Boolean(deliveryChoice?.deliveryAvailable)
+  // Unknown weight is not a delivery failure. Purchase the real listed pack
+  // through the same direct grocery-cart API, without claiming recipe coverage.
+  const manualPack = Boolean(choice && !quoteChoice && isUnmeasuredIngredientPack(choice, request.unit))
+  const manualValid = Boolean(!busy && !adding && manualPack && coverageOk && Number.isSafeInteger(count) && count >= choice.minimumPackCount && count <= maxCount)
+  const selectionMessage = !pinChecked ? '' : !coverageOk ? `Delivery unavailable for this offer at ${checkedPin}.`
+    : `Delivery available at ${checkedPin}.`
+  const quantityMessage = !choice ? '' : manualPack
+    ? `Sold as ${choice.packQuantity} ${choice.packUnit} per pack. Quantity in ${request.unit} is not specified. You can buy the listed packs, but they will not be counted as a confirmed recipe quantity.`
+    : quoteChoice ? (count < minCount ? `Select at least ${minCount} packs for this recipe.` : count > maxCount ? `Only ${maxCount} packs can be ordered.` : '')
+    : pinChecked && coverageOk ? (suggestedCount > (deliveryChoice?.deliveryMaximumPackCount ?? 0) ? 'Not enough packs for the recipe quantity.' : 'Recipe quantity could not be verified. Check again.') : ''
+  async function addManualPack() {
+    if (!manualValid || addingRef.current) return
+    addingRef.current = true; setAdding(true); setError('')
+    try {
+      let existing = null
+      try { existing = JSON.parse(window.sessionStorage.getItem('epantry-floating-marketplace-cart') || 'null') } catch {}
+      const result = await createDirectMarketplaceCart({
+        cartId: existing?.fulfillmentType === 'delivery' ? existing.cartId || null : null,
+        packId: deliveryChoice.packId, offerId: deliveryChoice.offerId, quantity: count,
+        pincode: checkedPin, fulfillmentType: 'delivery',
+        idempotencyKey: createCommerceIdempotencyKey('recipe-direct-pack'),
+      })
+      if (!result?.cart?.id || !Array.isArray(result.items)) throw new Error('The verified grocery basket was not returned.')
+      const items = result.items.map(item => {
+        const selected = String(item.offerId || '') === String(deliveryChoice.offerId) &&
+          String(item.packId || '') === String(deliveryChoice.packId)
+        const previous = existing?.cartId === result.cart.id && existing.items?.find(row =>
+          row.offerId && row.packId && String(row.offerId) === String(item.offerId) && String(row.packId) === String(item.packId))
+        return { id: item.id || item.packId, packId: item.packId || '', offerId: item.offerId || '', organizationId: item.organizationId || '', sellerName: item.sellerName || 'Marketplace Host', name: item.displayName || 'Product', quantity: Number(item.packCount || 1),
+          imageUrl: (selected && (deliveryChoice.imageUrl || choice?.imageUrl)) || item.imageUrl || previous?.imageUrl || '' }
+      })
+      try {
+        window.sessionStorage.setItem('epantry-floating-marketplace-cart', JSON.stringify({ cartId: result.cart.id, items, pincode: result.cart.pincode || checkedPin, fulfillmentType: result.cart.fulfillmentType || 'delivery', updatedAt: new Date().toISOString() }))
+        window.sessionStorage.removeItem('epantry-floating-cart-hidden')
+      } catch {}
+      notifyFloatingCartUpdated()
+      onFinish({ directPurchase: true })
+    } catch (err) {
+      setError(getCommerceErrorMessage(err, 'Unable to add this pack. Check delivery and stock again.'))
+    } finally { addingRef.current = false; setAdding(false) }
+  }
+  const closeDialog = () => { if (!addingRef.current) onFinish(null) }
+  return <dialog ref={ref} aria-labelledby="ingredient-pack-title" onCancel={event => { event.preventDefault(); closeDialog() }} className="ep-ingredient-pack-dialog"
+    style={{position:'fixed',inset:0,margin:'auto',width:'min(940px, calc(100% - 24px))',maxHeight:'94dvh',overflow:'hidden',padding:0,border:'1px solid #D7DDCF',borderRadius:16,background:'#F7F6F2',color:'#202421',boxShadow:'0 20px 70px #20242155'}}>
+    <style>{`
+      .ep-ingredient-pack-dialog::backdrop{background:#20242199}
+      .ep-ingredient-pack-dialog:focus{outline:none}
+      .ep-ingredient-pack-dialog .ep-pack-shell{display:flex;flex-direction:column;max-height:calc(94dvh - 2px);min-height:0;font-size:14px;line-height:1.45}
+      .ep-ingredient-pack-dialog .ep-pack-head{background:#C56C42;padding:17px 22px;display:flex;align-items:center;gap:18px;flex-shrink:0}
+      .ep-ingredient-pack-dialog .ep-pack-head-copy{min-width:0;flex:1}
+      .ep-ingredient-pack-dialog .ep-pack-head-copy p{font-size:13px;font-weight:650;margin:0 0 3px;color:#202421!important}
+      .ep-ingredient-pack-dialog #ingredient-pack-title{font-size:clamp(19px,2.3vw,27px)!important;font-weight:750;line-height:1.18;overflow-wrap:anywhere;color:#202421!important;margin:0}
+      .ep-ingredient-pack-dialog .ep-pack-need{border-left:1px solid #20242140;padding-left:18px;flex-shrink:0;color:#202421!important;display:grid;gap:2px;font-size:13px}
+      .ep-ingredient-pack-dialog .ep-pack-need strong{font-size:23px;line-height:1.15;color:#202421!important;white-space:nowrap}
+      .ep-ingredient-pack-dialog .ep-pack-close{display:grid;place-items:center;background:#F7F6F2!important;color:#202421!important;width:40px;height:40px;border-radius:9px;flex-shrink:0}
+      .ep-ingredient-pack-dialog .ep-pack-body{overflow-y:auto;min-height:0;overscroll-behavior:contain;padding:18px 22px 16px;display:flex;flex-direction:column;gap:18px}
+      .ep-ingredient-pack-dialog .ep-pack-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+      .ep-ingredient-pack-dialog .ep-pack-section-head h3,.ep-ingredient-pack-dialog .ep-pack-lower h3{font-size:17px!important;font-weight:750;line-height:1.25;letter-spacing:-.02em;margin:0;color:#202421!important}
+      .ep-ingredient-pack-dialog .ep-pack-section-head>span{font-size:13px;color:#173F35!important;white-space:nowrap}
+      .ep-ingredient-pack-dialog .ep-pack-table{border:1px solid #D7DDCF;border-radius:10px;overflow:hidden;background:#F7F6F2}
+      .ep-ingredient-pack-dialog .ep-pack-columns,.ep-ingredient-pack-dialog .ep-pack-row{display:grid;grid-template-columns:24px minmax(0,1fr) minmax(94px,.32fr) minmax(105px,.35fr);gap:12px;align-items:center;padding:10px 14px}
+      .ep-ingredient-pack-dialog .ep-pack-columns{background:#D7DDCF;color:#173F35!important;font-size:12px;font-weight:700;letter-spacing:.01em}
+      .ep-ingredient-pack-dialog .ep-pack-list{max-height:min(32dvh,310px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#C56C42 #F7F6F2}
+      .ep-ingredient-pack-dialog .ep-pack-row{min-height:85px;border-bottom:1px solid #D7DDCF;cursor:pointer;position:relative;box-shadow:inset 3px 0 transparent;margin:0}
+      .ep-ingredient-pack-dialog .ep-pack-row:last-child{border-bottom:0}
+      .ep-ingredient-pack-dialog .ep-pack-row[data-selected=true]{background:#F2DFD2;box-shadow:inset 3px 0 #C56C42}
+      .ep-ingredient-pack-dialog .ep-pack-row:hover{background:#F2DFD280}
+      .ep-ingredient-pack-dialog .ep-pack-row[data-selected=true]:hover{background:#F2DFD2}
+      .ep-ingredient-pack-dialog .ep-pack-row:focus-within{outline:2px solid #C56C42;outline-offset:-2px}
+      .ep-ingredient-pack-dialog .ep-pack-row p,.ep-ingredient-pack-dialog .ep-pack-row strong{margin:0;color:#202421!important;overflow-wrap:anywhere}
+      .ep-ingredient-pack-dialog .ep-pack-product{display:flex;align-items:center;gap:12px;min-width:0}
+      .ep-ingredient-pack-dialog .ep-pack-product-copy{min-width:0;display:grid;gap:3px;overflow-wrap:anywhere}
+      .ep-ingredient-pack-dialog .ep-pack-product-copy strong{font-size:14px;font-weight:700;line-height:1.3}
+      .ep-ingredient-pack-dialog .ep-pack-product-copy p{font-size:13px;color:#173F35!important}
+      .ep-ingredient-pack-dialog .ep-pack-photo{width:64px;height:64px;flex-shrink:0;border:1px solid #D7DDCF;border-radius:8px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#173F35;font-size:10px;text-align:center}
+      .ep-ingredient-pack-dialog .ep-pack-photo>span{display:grid;justify-items:center;gap:2px;padding:4px}
+      .ep-ingredient-pack-dialog .ep-pack-photo img{width:100%;height:100%;object-fit:contain}
+      .ep-ingredient-pack-dialog .ep-pack-size,.ep-ingredient-pack-dialog .ep-pack-price{display:grid;gap:3px;min-width:0;align-content:center;overflow-wrap:anywhere}
+      .ep-ingredient-pack-dialog .ep-pack-size strong{font-size:17px;color:#173F35!important;font-weight:750}
+      .ep-ingredient-pack-dialog .ep-pack-size small,.ep-ingredient-pack-dialog .ep-pack-price small{font-size:12px;color:#173F35!important;line-height:1.3}
+      .ep-ingredient-pack-dialog .ep-pack-price{text-align:right}
+      .ep-ingredient-pack-dialog .ep-pack-price strong{font-size:17px;font-weight:750;font-variant-numeric:tabular-nums}
+      .ep-ingredient-pack-dialog .ep-pack-delivery-state{display:flex;align-items:center;gap:4px;font-size:12px;line-height:1.3;font-weight:650}
+      .ep-ingredient-pack-dialog .ep-pack-radio{accent-color:#173F35;width:18px;height:18px;margin:0;justify-self:center}
+      .ep-ingredient-pack-dialog .ep-pack-lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+      .ep-ingredient-pack-dialog .ep-pack-pin-panel{min-width:0;display:grid;gap:8px}
+      .ep-ingredient-pack-dialog .ep-pack-pin-form{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+      .ep-ingredient-pack-dialog .ep-pack-pin-form input{flex:1 1 100px;min-width:0;min-height:44px;border:1px solid #B9C4B3;border-radius:8px;background:#fff!important;color:#202421!important;padding:9px 12px;font-size:16px}
+      .ep-ingredient-pack-dialog .ep-pack-btn{background:#C56C42!important;color:#202421!important;border-radius:8px;padding:10px 16px;font-weight:700;min-height:44px;white-space:normal;font-size:14px;line-height:1.25}
+      .ep-ingredient-pack-dialog .ep-pack-btn:disabled{opacity:.45;cursor:not-allowed}
+      .ep-ingredient-pack-dialog .ep-pack-step{height:42px;width:42px;border:1px solid #B9C4B3;border-radius:7px;display:grid;place-items:center;color:#173F35!important;background:#F7F6F2!important;flex-shrink:0}
+      .ep-ingredient-pack-dialog .ep-pack-step:disabled{opacity:.4;cursor:not-allowed}
+      .ep-ingredient-pack-dialog .ep-pack-selection{background:#D7DDCF;border-radius:10px;padding:12px 14px;min-width:0;display:grid;gap:8px}
+      .ep-ingredient-pack-dialog .ep-pack-selection-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+      .ep-ingredient-pack-dialog .ep-pack-count{display:flex;align-items:center;gap:9px}
+      .ep-ingredient-pack-dialog .ep-pack-count output{font-size:18px;font-weight:750;text-align:center;min-width:24px;color:#202421!important}
+      .ep-ingredient-pack-dialog .ep-pack-selection p{margin:0;color:#173F35!important;font-size:13px;overflow-wrap:anywhere}
+      .ep-ingredient-pack-dialog .ep-pack-note{font-size:13px!important;line-height:1.4;border-left:2px solid #C56C42;padding-left:8px;color:#202421!important}
+      .ep-ingredient-pack-dialog .ep-pack-status{font-size:13px;font-weight:650;display:flex;align-items:center;gap:5px;margin:0;overflow-wrap:anywhere}
+      .ep-ingredient-pack-dialog .ep-pack-footer{display:flex;align-items:center;gap:14px;padding:12px 22px;background:#D7DDCF;flex-shrink:0;border-top:1px solid #B9C4B3}
+      .ep-ingredient-pack-dialog .ep-pack-cancel{font-weight:650;color:#173F35!important;min-height:44px;padding:4px 2px}
+      .ep-ingredient-pack-dialog .ep-pack-total{margin-left:auto;display:grid;gap:1px;text-align:right;min-width:0;color:#173F35!important;font-size:12px}
+      .ep-ingredient-pack-dialog .ep-pack-total strong{font-size:23px;line-height:1.15;font-weight:750;color:#173F35!important;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+      .ep-ingredient-pack-dialog button:focus-visible,.ep-ingredient-pack-dialog input:focus-visible{outline:2px solid #173F35;outline-offset:2px}
+      @media(max-width:640px){
+        .ep-ingredient-pack-dialog .ep-pack-head{padding:13px 14px;gap:9px;flex-wrap:wrap}
+        .ep-ingredient-pack-dialog .ep-pack-head-copy{flex:1 1 calc(100% - 55px);order:0}
+        .ep-ingredient-pack-dialog .ep-pack-close{order:1;width:38px;height:38px}
+        .ep-ingredient-pack-dialog .ep-pack-need{order:2;border:0;padding:0;display:flex;align-items:baseline;gap:8px;font-size:13px;flex-basis:100%}
+        .ep-ingredient-pack-dialog .ep-pack-need strong{font-size:18px}
+        .ep-ingredient-pack-dialog .ep-pack-body{padding:13px 12px;gap:13px}
+        .ep-ingredient-pack-dialog .ep-pack-columns{display:none}
+        .ep-ingredient-pack-dialog .ep-pack-row{grid-template-columns:20px minmax(0,1fr) minmax(70px,auto);gap:7px 10px;padding:10px;align-items:center}
+        .ep-ingredient-pack-dialog .ep-pack-radio{grid-column:1;grid-row:1 / span 2}
+        .ep-ingredient-pack-dialog .ep-pack-product{grid-column:2 / -1;grid-row:1;gap:8px}
+        .ep-ingredient-pack-dialog .ep-pack-photo{width:54px;height:54px}
+        .ep-ingredient-pack-dialog .ep-pack-size{grid-column:2;grid-row:2}
+        .ep-ingredient-pack-dialog .ep-pack-price{grid-column:3;grid-row:2}
+        .ep-ingredient-pack-dialog .ep-pack-size strong,.ep-ingredient-pack-dialog .ep-pack-price strong{font-size:15px}
+        .ep-ingredient-pack-dialog .ep-pack-list{max-height:min(42dvh,290px)}
+        .ep-ingredient-pack-dialog .ep-pack-lower{grid-template-columns:minmax(0,1fr);gap:12px}
+        .ep-ingredient-pack-dialog .ep-pack-footer{padding:9px 12px;gap:8px;display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1.2fr)}
+        .ep-ingredient-pack-dialog .ep-pack-footer .ep-pack-btn{padding:9px;font-size:13px}
+        .ep-ingredient-pack-dialog .ep-pack-total{margin:0}
+        .ep-ingredient-pack-dialog .ep-pack-total strong{font-size:19px}
+      }
+      @media(max-width:360px){.ep-ingredient-pack-dialog .ep-pack-footer{grid-template-columns:auto minmax(0,1fr)}.ep-ingredient-pack-dialog .ep-pack-footer .ep-pack-btn{grid-column:1 / -1}.ep-ingredient-pack-dialog .ep-pack-total{justify-self:end}}
+    `}</style>
+    <div className="ep-pack-shell">
+      <header className="ep-pack-head">
+        <div className="ep-pack-head-copy"><p>Choose packs</p><h2 id="ingredient-pack-title">{request.name}</h2></div>
+        <div className="ep-pack-need"><span>Recipe needs</span><strong>{quoteChoice?.requirementQuantity??request.quantity} {quoteChoice?.requirementUnit||request.unit}</strong></div>
+        <button className="ep-pack-close" type="button" aria-label="Close pack selection" disabled={adding} onClick={closeDialog}><X size={20}/></button>
+      </header>
+      <div className="ep-pack-body">
+        <section style={{minWidth:0}}>
+          <div className="ep-pack-section-head"><h3>Available packs</h3><span>{candidates.length} {candidates.length===1?'option':'options'}</span></div>
+          <div className="ep-pack-table">
+            <div className="ep-pack-columns" aria-hidden="true"><span/><span>Product / Host</span><span>Pack size</span><span style={{textAlign:'right'}}>Price / pack</span></div>
+            <div className="ep-pack-list" role="group" aria-label="Available seller packs">
+              {candidates.map(row=>{
+                const key=packKey(row), active=selectedKey===key, checked=pinChecked?verified[key]:null, delivery=pinChecked?deliveryRows[key]:null
+                const livePrice=checked?.unitPrice||delivery?.unitPrice||row.unitPrice
+                return <label className="ep-pack-row" key={key} data-selected={active}>
+                  <input className="ep-pack-radio" type="radio" name="ingredient-pack" checked={active} disabled={busy||adding} onChange={()=>selectRow(row)}/>
+                  <div className="ep-pack-product">
+                    <IngredientOfferPhoto url={delivery?.imageUrl || row.imageUrl} name={row.productDisplayName || request.name}/>
+                    <div className="ep-pack-product-copy"><strong>{row.productDisplayName || request.name}</strong><p>{row.sellerName}</p>
+                      {pinChecked && <span className="ep-pack-delivery-state" style={{color:delivery?.deliveryAvailable?'#173F35':'#8F3226'}}>{delivery?.deliveryAvailable&&<Check size={13} aria-hidden="true"/>}{delivery?.deliveryAvailable?'Delivery available':'Unavailable at PIN'}</span>}
+                    </div>
+                  </div>
+                  <div className="ep-pack-size"><strong>{formatQuantity(row.packQuantity)} {row.packUnit}</strong><small>Up to {delivery?.deliveryAvailable?delivery.deliveryMaximumPackCount:row.maximumPackCount} packs</small></div>
+                  <div className="ep-pack-price"><strong>{formatMoney(livePrice)}</strong><small>per pack</small></div>
+                </label>
+              })}
+            </div>
+          </div>
+        </section>
+        <div className="ep-pack-lower">
+          <section className="ep-pack-pin-panel">
+            <h3>Delivery PIN</h3>
+            <form onSubmit={event=>{event.preventDefault();void checkDelivery(pin.trim())}} className="ep-pack-pin-form"><input aria-label="Delivery PIN" inputMode="numeric" maxLength={6} value={pin} placeholder="6-digit PIN" disabled={busy||adding} onChange={event=>{setPin(event.target.value.replace(/\D/g,''));setVerified({});setDeliveryRows({});setCheckedPin('');setError('')}}/><button className="ep-pack-btn" disabled={busy||adding||! /^[1-9]\d{5}$/.test(pin)} type="submit">{busy?'Checking...':'Check delivery'}</button></form>
+            {busy && <p role="status" className="ep-pack-status" style={{color:'#173F35'}}>Checking delivery and stock...</p>}
+            {!busy && pinChecked && <p role="status" className="ep-pack-status" style={{color:coverageOk?'#173F35':'#8F3226'}}>{coverageOk&&<Check size={17}/>} {selectionMessage}</p>}
+            {!busy && pinChecked && !coverageOk && <button type="button" onClick={()=>{closeDialog();openAvailabilityNotifyModal({query:request.name,displayName:request.name,canonicalIngredientId:request.canonicalIngredientId,source:'recipe'})}} style={{color:'#173F35',fontWeight:700,textDecoration:'underline',justifySelf:'start',fontSize:13}}>Notify me when available</button>}
+          </section>
+          <section className="ep-pack-selection" aria-label="Selected pack quantity">
+            <div className="ep-pack-selection-top"><h3>Pack quantity</h3>
+              {choice && <div className="ep-pack-count"><button className="ep-pack-step" type="button" aria-label="Decrease packs" disabled={busy||adding||count<=choice.minimumPackCount} onClick={()=>setCount(v=>v-1)}><Minus size={17}/></button><output aria-live="polite">{count}</output><button className="ep-pack-step" type="button" aria-label="Increase packs" disabled={busy||adding||count>=maxCount} onClick={()=>setCount(v=>v+1)}><Plus size={17}/></button></div>}
+            </div>
+            {choice && <p aria-live="polite">Selected: <strong>{formatQuantity(choice.packQuantity*count)} {choice.packUnit}</strong>{quoteChoice ? ` · ${extra===0?'Exact quantity':extra>0?`${extra} ${quoteChoice.requirementUnit} extra`:`${-extra} ${quoteChoice.requirementUnit} still needed`}` : suggestedCount ? ` · ${suggestedCount} packs needed` : ''}</p>}
+            {quantityMessage && <p role="status" className="ep-pack-note">{manualPack?`Pack weight/volume not specified in ${request.unit}. Adds to grocery basket only; recipe quantity remains unconfirmed.`:quantityMessage}</p>}
+          </section>
+        </div>
+        {error && <p role="alert" style={{color:'#8F3226',padding:10,background:'#F7E6DD',borderRadius:8,margin:0,fontSize:14}}>{error}</p>}
       </div>
+      <footer className="ep-pack-footer"><button className="ep-pack-cancel" type="button" disabled={adding} onClick={closeDialog}>Cancel</button>
+        {choice && <div className="ep-pack-total" aria-live="polite"><span>Items total</span><strong>{formatMoney({...price,amountMinor:price.amountMinor*count})}</strong></div>}
+        <button type="button" className="ep-pack-btn" disabled={manualPack?!manualValid:!valid} onClick={()=>{if(manualPack){void addManualPack();return}if(valid) onFinish({offerId:quoteChoice.offerId,packId:quoteChoice.packId,productVersionId:quoteChoice.productVersionId,packCount:count,packQuantity:quoteChoice.packQuantity,packUnit:quoteChoice.packUnit,requirementQuantity:quoteChoice.requirementQuantity,requirementUnit:quoteChoice.requirementUnit,unitPrice:quoteChoice.unitPrice,sellerName:quoteChoice.sellerName,productDisplayName:quoteChoice.productDisplayName,imageUrl:deliveryChoice?.imageUrl||choice.imageUrl||'',pincode:checkedPin,suppliedQuantity:supplied})}}>{adding?'Adding...':manualPack?'Add to grocery basket':'Add selected packs'}</button>
+      </footer>
     </div>
-    <footer style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:16,background:'#D7DDCF',flexWrap:'wrap'}}><button type="button" onClick={()=>onFinish(null)} style={{color:'#173F35',fontWeight:600}}>Cancel</button><button type="button" className="ep-ingredient-pack-btn" disabled={!valid} onClick={()=>{if(valid) onFinish({offerId:quoteChoice.offerId,packId:quoteChoice.packId,productVersionId:quoteChoice.productVersionId,packCount:count,packQuantity:quoteChoice.packQuantity,packUnit:quoteChoice.packUnit,requirementQuantity:quoteChoice.requirementQuantity,requirementUnit:quoteChoice.requirementUnit,unitPrice:quoteChoice.unitPrice,sellerName:quoteChoice.sellerName,productDisplayName:quoteChoice.productDisplayName,pincode:pin,suppliedQuantity:supplied})}}>Add selected packs</button></footer>
   </dialog>
 }
 
@@ -2025,6 +2228,34 @@ export default function RecipeDetailPage() {
     return () => { active = false }
   }, [canUseCustomerFeatures, ingredientAvailabilityIds, ingredientAvailabilityKey])
 
+  // Recover photos for existing cart rows saved before the trolley stored images.
+  // Use only the exact approved offer + pack, never another seller's photo.
+  useEffect(() => {
+    if (!canUseCustomerFeatures || ingredientAvailability.key !== ingredientAvailabilityKey) return
+    const offers = Object.values(ingredientAvailability.rows).flat()
+    if (!offers.length) return
+    try {
+      const key = 'epantry-floating-marketplace-cart'
+      const cart = JSON.parse(window.sessionStorage.getItem(key) || 'null')
+      if (!cart?.cartId || !Array.isArray(cart.items)) return
+      let changed = false
+      const items = cart.items.map(item => {
+        if (item.imageUrl || !item.offerId || !item.packId) return item
+        const match = offers.find(offer => String(offer.offerId) === String(item.offerId) &&
+          String(offer.packId) === String(item.packId) && offer.imageUrl)
+        if (!match) return item
+        changed = true
+        return { ...item, imageUrl: match.imageUrl }
+      })
+      if (changed) {
+        window.sessionStorage.setItem(key, JSON.stringify({ ...cart, items }))
+        window.dispatchEvent(new CustomEvent('epantry-cart-updated', { detail: { show: false } }))
+      }
+    } catch {
+      // Photo enrichment is display-only; never block a purchase.
+    }
+  }, [canUseCustomerFeatures, ingredientAvailability, ingredientAvailabilityKey])
+
   // For names that have no unambiguous automatic match, the customer can
   // choose the correct EXISTING catalog ingredient once, directly from I have.
   useEffect(() => {
@@ -2699,6 +2930,7 @@ export default function RecipeDetailPage() {
         purchaseMode: hostListingMode ? 'full_recipe' : 'missing_only' })
     })
     if (!packSelection) return false
+    if (packSelection.directPurchase) { notifyFloatingCartFly({ name, sourceElement }); return false }
     setShoppingTray((current) => {
       const existingIndex = current.findIndex(
         (item) => item.canonicalIngredientId === canonicalIngredientId,
@@ -2708,7 +2940,7 @@ export default function RecipeDetailPage() {
         name,
         quantity: packSelection.requirementQuantity,
         unit: packSelection.requirementUnit,
-        imageUrl: ingredient.imageUrl || identity.imageUrl || '',
+        imageUrl: packSelection.imageUrl || ingredient.imageUrl || identity.imageUrl || '',
         packSelection,
       }
       const next = existingIndex >= 0

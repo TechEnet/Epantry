@@ -530,7 +530,11 @@ commerceRoutes.get(
       'RECIPE_INGREDIENT_PACKS_INVALID',
       'Invalid ingredient IDs.',
     )
-    return sendSuccess(req, res, 200, await listRecipeIngredientPacks({ canonicalIngredientIds: ids }), 'Ingredient packs loaded.')
+    const pincode = req.query.pincode === undefined ? undefined : parseOrThrow(
+      z.string().regex(/^[1-9][0-9]{5}$/), req.query.pincode,
+      'RECIPE_INGREDIENT_PIN_INVALID', 'Enter a valid 6-digit Indian delivery PIN.',
+    )
+    return sendSuccess(req, res, 200, await listRecipeIngredientPacks({ canonicalIngredientIds: ids, pincode }), 'Ingredient packs loaded.')
   }),
 )
 
